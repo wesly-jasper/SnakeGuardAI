@@ -1,0 +1,4 @@
+species,venom_syndrome,symptom,onset_min_hours,onset_max_hours,frequency,source_key
+Naja naja,neurotoxic,ptosis,,,,TODO
+Daboia russelii,haemotoxic,incoagulable_blood,,,,TODO
+Echis carinatus,haemotoxic,local_swelling,,,,TODO

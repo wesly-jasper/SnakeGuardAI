@@ -1,0 +1,29 @@
+# Environment
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Data: never commit
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Model weights and exports
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.tflite
+checkpoints/
+outputs/
+runs/
+
+# Notebooks / editors / OS
+.ipynb_checkpoints/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
