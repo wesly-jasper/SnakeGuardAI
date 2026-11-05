@@ -1,0 +1,9 @@
+species,common_name,group,dry_bite_rate,source_key,evidence,verified
+Naja naja,Spectacled cobra,venomous,0.20,kularatne2009cobra,"[abstract only] 5/25: 'There were 5 dry bites (20%)'. Alternative: who2016guidelines p.69 '30% of bites by cobras'",false
+Bungarus caeruleus,Common krait,venomous,0.045,ariaratnam2008krait,"p.459 'Only four patients (4.5%) showed no signs of envenoming at any stage' (4/88). Alternative: silva2016krait 8/33",false
+Daboia russelii,Russell's viper,venomous,0.036,kularatne2014revisiting,"Results 'giving a dry bite rate of 4%' (2/55, hospital series). CONFLICT: who2016guidelines p.69 'About 50% of bites by ... Russell's vipers'",false
+Echis carinatus,Saw-scaled viper,venomous,0.075,who2016guidelines,"Sec 3.4.2 p.69 '5-10% of bites by saw-scaled vipers do not result in any symptoms'; value = midpoint of the guideline range, no primary series",false
+Hypnale hypnale,Hump-nosed pit viper,venomous,0.086,ariaratnam2008frequent,"Sec 3.5.1 'Twenty-six patients (9%) showed no evidence of envenoming at any stage' (26/302)",false
+Ptyas mucosa,Indian rat snake,non-venomous,,,,false
+Lycodon aulicus,Common wolf snake,non-venomous,,,,false
+Fowlea piscator,Checkered keelback,non-venomous,,,,false

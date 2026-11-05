@@ -1,0 +1,18 @@
+# Synthetic patient dataset v1. Output is SIMULATION data.
+name: sim_v1
+seed: 42
+n_patients: 20000
+knowledge_dir: knowledge
+output_dir: data/processed/sim_v1
+presentation_hours: [0.5, 24.0]
+species_weights: null          # uniform until a cited epidemiological mix is chosen
+syndrome_precedence: [haemotoxic, neurotoxic]
+# Fills blank onset bounds for rows with a cited frequency but no cited onset window.
+# Basis: mohfw2017stg p.55 'If no symptoms and signs develop after 24 hours the patient can
+# be discharged' (all signs assumed to appear within 0-24 h). Set to null to drop such rows.
+onset_fallback:
+  hours: [0, 24]
+  source_key: mohfw2017stg
+splits: {train: 0.6, calibration: 0.2, test: 0.2}
+require_citations: false       # set true once knowledge/ is fully filled
+require_verified: false        # set true once every row is human-checked

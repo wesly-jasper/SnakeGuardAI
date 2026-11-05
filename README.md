@@ -37,25 +37,46 @@ tests/
 
 ## Clinical knowledge table
 
-`knowledge/clinical_table.csv` has one row per (species, symptom):
+The knowledge base in `knowledge/` (loaded by `src/data/knowledge.py`):
 
-| column | meaning |
-|---|---|
-| species | binomial name, e.g. `Naja naja` |
-| venom_syndrome | `neurotoxic`, `haemotoxic`, `local-only`, `non-venomous` |
-| symptom | snake_case symptom name, e.g. `ptosis` |
-| onset_min_hours / onset_max_hours | typical onset window, hours since bite |
-| frequency | probability (0 to 1) the symptom appears for this species |
-| source_key | BibTeX key in `knowledge/sources.bib` |
+| file | one row per | main columns |
+|---|---|---|
+| `symptoms.csv` | symptom in the controlled vocabulary | `marker` (neurotoxic / haemotoxic / local / none) |
+| `species.csv` | species | `group` (venomous / non-venomous), `dry_bite_rate` |
+| `clinical_table.csv` | (species, symptom) | `onset_min_hours`, `onset_max_hours`, `frequency` |
+| `context_table.csv` | (species, feature) | `feature` (night / indoor / asleep), `probability` |
 
-Rows with `source_key=TODO` or blank numbers are placeholders. The loader skips incomplete
-rows with a warning; `load_clinical_table(..., require_citations=True)` refuses uncited rows.
+Every numeric row also has `source_key` (one or more BibTeX keys from `sources.bib`,
+separated by `;`), `evidence` (locator + short verbatim quote) and `verified` (true only
+after a human has checked the number against the source PDF). Draft literature extractions
+with quotes live in `knowledge/extraction/`.
+
+Rows with `source_key=TODO` or blank numbers are placeholders and are skipped with a warning.
+`load_knowledge(..., require_citations=True)` refuses uncited or blank rows, and
+`require_verified=True` refuses unverified ones.
+
+## Simulated data
+
+```bash
+python -m src.data.generate --config configs/sim_v1.yaml
+```
+
+Writes `patients.csv`, `events.csv`, `meta.json` and a sanity `report.md` (with a rule-based
+syndromic baseline) to `data/processed/sim_v1/`. The venom syndrome label comes from each
+patient's full symptom course, while the model only sees events up to presentation. All of this
+is **simulation data**. See `docs/phase1_plan.md`.
+
+Knowledge rows are AI-assisted drafts until checked by a person. To list what still needs checking:
+
+```bash
+python -m src.data.checklist   # writes docs/verification_checklist.md
+```
 
 ## Status
 
 - [x] Phase 0: repo, environment, tests
-- [ ] Phase 1: clinical knowledge table (filled from literature) + simulator.
-      The simulator code exists as scaffolding; GPS and month are uniform placeholders until Phase 3.
+- [x] Phase 1: clinical knowledge table + simulator (engineering done; rows await human verification,
+      see docs/verification_checklist.md). GPS and month are uniform placeholders until Phase 3.
 - [ ] Phase 2: symptom-only baselines
 - [ ] Phase 3: geographic prior (GBIF)
 - [ ] Phase 4: image branch (SnakeCLEF)

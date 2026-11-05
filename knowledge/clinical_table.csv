@@ -1,4 +1,53 @@
-species,venom_syndrome,symptom,onset_min_hours,onset_max_hours,frequency,source_key
-Naja naja,neurotoxic,ptosis,,,,TODO
-Daboia russelii,haemotoxic,incoagulable_blood,,,,TODO
-Echis carinatus,haemotoxic,local_swelling,,,,TODO
+species,symptom,onset_min_hours,onset_max_hours,frequency,source_key,evidence,verified
+Bungarus caeruleus,ptosis,0.5,4.0,1.0,silva2016krait; ariaratnam2008krait,"freq: silva2016krait Table 2, 25/25 envenomed (partial+complete). onset: ariaratnam2008krait p.459 'first detected 30 minutes to 4 hours after the bite'. CONFLICT: mohfw2017stg p.12 'after 6-12 hours'",False
+Bungarus caeruleus,ophthalmoplegia,0.5,12.0,0.72,silva2016krait; ariaratnam2008krait,"Table 2, 18/25 envenomed (partial+complete). onset not found | onset: max: silva2016krait Results, one mild patient 'complete ptosis with partial ophthalmoplegia ... within 12h of the bite' (severe group intubated within 7h, ophthalmoplegia preceding); min 0.5 h from ariaratnam2008krait p.459 'Ptosis, the earliest sign of neurotoxicity, was first detected 30 minutes'",False
+Bungarus caeruleus,bulbar_palsy,0.5,7.0,0.68,silva2016krait; ariaratnam2008krait,"Table 2 'Difficulty in swallowing' 17/25 envenomed; Discussion: developed 'within 7h of the bite' (upper bound only) | onset: max: silva2016krait observed 'within 7h' (upper bound); min 0.5 h from ariaratnam2008krait p.459 'Ptosis, the earliest sign of neurotoxicity, was first detected 30 minutes'",False
+Bungarus caeruleus,respiratory_paralysis,0.5,13.0,0.667,ariaratnam2008krait,p.459 'Fifty-six patients (64%) developed respiratory failure' / 'between 30 minutes and 13 hours after the bite'; 56/84 envenomed (88 bites minus 4 dry),False
+Bungarus caeruleus,limb_weakness,0.5,8.0,0.48,silva2016krait; ariaratnam2008krait,"Table 2 'Reduced upper limb power' 12/25 envenomed; complete paralysis 'within 8h of the bite' (upper bound only) | onset: max: silva2016krait complete paralysis 'within 8h' (upper bound); min 0.5 h from ariaratnam2008krait p.459 'Ptosis, the earliest sign of neurotoxicity, was first detected 30 minutes'",False
+Bungarus caeruleus,abdominal_pain,0.0,4.0,0.91,ariaratnam2008krait; mandal2023krait; kularatne1998krait,"p.459 'Abdominal pain ... and vomiting, was reported by 91% of patients' (all 88 bites; pain and vomiting reported together). onset not found | onset: LOW QUALITY: mandal2023krait Discussion (uncited narrative) 'he usually wakes up 2-4 h after the bite, due to severe colicky pain'; kularatne1998krait p.55 'Abdominal pain is the first symptom ... within minutes to few hours'; min 0 by rule",False
+Bungarus caeruleus,local_swelling,,,0.095,ariaratnam2008krait,p.459 'Slight local swelling was detectable in only eight patients (9%)'; 8/84 envenomed,False
+Bungarus caeruleus,local_pain,,,0.024,ariaratnam2008krait,p.459 'paraesthesiae (numbness) in four cases and pain in two cases'; 2/84 envenomed,False
+Bungarus caeruleus,incoagulable_blood,,,0.0,ariaratnam2008krait,"p.459 'All patients had coagulable blood, detected by 20 WBCT'",False
+Bungarus caeruleus,systemic_bleeding,,,0.0,ariaratnam2008krait,p.459 'None showed any evidence of spontaneous bleeding or incoagulable blood',False
+Naja naja,ptosis,0.5,6.0,0.45,kularatne2009cobra; mohfw2017stg,freq: [abstract only] '9 cases of neurotoxicity (36%)' of 25 bites = 9/20 envenomed; ANY neurotoxicity mapped to ptosis. onset: mohfw2017stg p.12 'within 30 min- 6 hours in case of Cobra bite' (guideline),False
+Naja naja,respiratory_paralysis,2.0,5.0,0.2,kularatne2009cobra,[abstract only] 'Four patients (16%) developed respiratory paralysis; their median time from bite to assisted ventilation was 2h (range 2-5h)'; 4/20 envenomed; onset = bite-to-ventilation,False
+Naja naja,local_swelling,,,1.0,kularatne2009cobra,[abstract only] '20 local reactions (80%)' of 25 = 20/20 envenomed; 'local reaction' mapped to swelling. silva2026cobra: 45/54 local envenoming,False
+Naja naja,local_necrosis,,,0.4,kularatne2009cobra,[abstract only] 'Eight patients (32%) had severe local necrosis'; 8/20 envenomed. silva2026cobra: 5/54 needing grafts,False
+Naja naja,incoagulable_blood,,,0.15,kularatne2009cobra,[abstract only] '3 cases of coagulopathy (12%)'; 3/20 envenomed; authors: 'Coagulopathy requires verification'. DECISION: keep or set 0,False
+Daboia russelii,local_pain,,,1.0,kularatne2014revisiting,Table 2 proven 'Pain 53 (96)'; 53/53 envenomed (55 minus 2 dry),False
+Daboia russelii,local_swelling,,,0.925,kularatne2014revisiting,Table 2 proven 'Swelling 49 (89)'; 49/53 envenomed,False
+Daboia russelii,blistering,,,0.019,kularatne2014revisiting,Table 2 proven 'Blistering 1 (2)'; 1/53,False
+Daboia russelii,local_necrosis,,,0.019,kularatne2014revisiting,Table 2 proven 'Necrosis 1 (2)'; 1/53. kularatne2003russell abstract: 8.9%,False
+Daboia russelii,incoagulable_blood,0.58,16.0,0.717,kularatne2014revisiting,Table 2 proven 'Incoagulable blood (20 WBCT) 38 (69)'; 38/53; 'Time duration from bite to coagulopathy ... 167.5 (35-960)' minutes,False
+Daboia russelii,systemic_bleeding,,,,kularatne2014revisiting,"Table 2 proven: gum 2, GI 1, haematuria 1, epistaxis 0 of 55; patient total not given",False
+Daboia russelii,acute_kidney_injury,,,0.094,kularatne2014revisiting,Table 2 proven 'Renal dysfunction Total 5 (9)'; 5/53,False
+Daboia russelii,shock,,,0.019,kularatne2014revisiting,Table 2 proven 'Cardiovascular dysfunction Total 1 (2)'; 1/53; mapping to shock needs review,False
+Daboia russelii,ptosis,0.0,8.0,0.566,kularatne2014revisiting; silva2016neurotoxicity,freq: Table 2 proven 'Ptosis 30 (55)'; 30/53. onset: silva2016neurotoxicity [abstract only] 'within 8h post-bite in all patients' (upper bound only) | onset: upper bound 'within 8 h' only; min set to 0 by rule,False
+Daboia russelii,ophthalmoplegia,0.0,8.0,0.566,kularatne2014revisiting; silva2016neurotoxicity,Table 2 proven 'Ophthalmoplegia 30 (55)'; 30/53 | onset: silva2016neurotoxicity [abstract only] 'Neurotoxicity developed within 8 h post-bite in all patients' (upper bound; min set to 0 by rule),False
+Daboia russelii,bulbar_palsy,,,0.0,silva2016neurotoxicity,"[abstract only] 'No bulbar, respiratory or limb muscle weakness occurred' (245 bites)",False
+Daboia russelii,respiratory_paralysis,,,0.0,kularatne2014revisiting,Table 2 proven 'Respiratory paralysis 0'. kularatne2003russell abstract: 8/336 ventilated,False
+Daboia russelii,limb_weakness,,,0.0,silva2016neurotoxicity,"[abstract only] 'No bulbar, respiratory or limb muscle weakness occurred' (245 bites)",False
+Daboia russelii,abdominal_pain,0.08,4.0,0.642,kularatne2014revisiting,Results/Table 7: 34 of 55 proven; 34/53 envenomed; 'The pain had developed 5 to 240 minutes (mean 71 minutes) after the bite',False
+Echis carinatus,local_pain,,,0.958,gnanathasan2012sawscaled,Table 2 'Local pain 46 (96%)'; 46/48 bites (envenomed count not stated). Sri Lankan E. c. carinatus,False
+Echis carinatus,local_swelling,0.0,1.5,0.646,gnanathasan2012sawscaled; bawaskar2019diagnosis,"Table 2 'Swelling 31 (65%)'; 31/48 bites | onset: bawaskar2019diagnosis Discussion 'within one 60-90 minutes there is progressive swelling over the bitten part' (narrative; upper bound, min set to 0 by rule)",False
+Echis carinatus,incoagulable_blood,0.67,18.25,0.708,gnanathasan2012sawscaled; kularatne2011revisiting,"Results 'Incoagulable blood as assessed by the 20WBCT was seen in 34 (71%) of patients'; 34/48. Rajasthan E. c. sochureki (gopalakrishnan2025antivenom): 103/105 | onset: kularatne2011revisiting [abstract only] 'blood incoagulability manifested between 40 and 1095min after the bite' (range, Sri Lanka)",False
+Echis carinatus,systemic_bleeding,,,0.292,gnanathasan2012sawscaled,Results 'Spontaneous bleeding was observed in 14 (29%) patients'; 14/48. Rajasthan: 55/105,False
+Echis carinatus,vomiting,,,0.083,gnanathasan2012sawscaled,Results 'Nausea and vomiting was reported by 4 (8%) patients'; 4/48,False
+Echis carinatus,abdominal_pain,,,0.021,gnanathasan2012sawscaled,Results 'one (2%) had severe abdominal pain'; 1/48,False
+Echis carinatus,acute_kidney_injury,,,,gnanathasan2012sawscaled; mohfw2016stg; gopalakrishnan2025antivenom,CONFLICT: mohfw2016stg p.7 'not seen with Saw scale viper'; gopalakrishnan2025antivenom 19/105 (E. c. sochureki); gnanathasan2012sawscaled no count,False
+Hypnale hypnale,local_pain,0.66,1.5,0.978,ariaratnam2008frequent; abraham2025single,"freq: Sec 3.5.1 'pain (270; 89%)' of 302; 270/276 envenomed (26 dry). onset: abraham2025single time to ANY local sign 'median = 70, IQR: 39.5-90' min",False
+Hypnale hypnale,local_swelling,0.66,1.5,1.0,ariaratnam2008frequent; abraham2025single,freq: Sec 3.5.1 'local swelling (276; 91%)'; 276/276 envenomed. onset: abraham2025single any local sign IQR 39.5-90 min,False
+Hypnale hypnale,progressive_swelling,,,0.14,maduwage2013epidemiology,"[abstract only] '16 (14%) developed extensive local swelling ... more than half of the bitten limb'; 16/114 bites, genus Hypnale (93/114 H. hypnale)",False
+Hypnale hypnale,blistering,,,0.674,ariaratnam2008frequent,Sec 3.5.1 'blistering (186; 62%)'; 186/276 envenomed,False
+Hypnale hypnale,local_necrosis,,,0.174,ariaratnam2008frequent,Sec 3.5.1 'Forty-eight patients (16%) developed local necrosis'; 48/276,False
+Hypnale hypnale,regional_lymphadenopathy,,,0.451,sajeethkumar2018clinical,Table 2 HNPV 'Regional lymphadenopathy ... 101 (45%)'; 101/224 envenomed (Kerala),False
+Hypnale hypnale,incoagulable_blood,0.25,48.0,0.424,ariaratnam2008frequent,Sec 3.5.2 'In 117 patients (39%) blood incoagulability was first detected between 15 min and 48 h after the bite'; 117/276,False
+Hypnale hypnale,systemic_bleeding,,,0.199,ariaratnam2008frequent,Sec 3.5.2 'Spontaneous systemic bleeding ... was observed in 55 patients (18%)'; 55/276,False
+Hypnale hypnale,acute_kidney_injury,,,0.109,ariaratnam2008frequent,Sec 3.5.2 'Thirty patients (10%) developed acute renal failure requiring dialysis'; 30/276,False
+Hypnale hypnale,ptosis,,,0.0,ariaratnam2008frequent,Sec 3.5.2 'Neurological manifestations were not observed in any patient',False
+Hypnale hypnale,abdominal_pain,,,0.163,ariaratnam2008frequent,Table 3 'Abdominal pain 45 (15)' (row realigned from PDF; check by eye); 45/276,False
+Hypnale hypnale,vomiting,,,0.217,ariaratnam2008frequent,Table 3 'Nausea and vomiting 60 (20)' (row realigned from PDF; check by eye); 60/276,False
+Hypnale hypnale,headache,,,0.025,rathnayaka2022epidemiological,Results 'headache in 1 (2.5%)'; 1/40 children,False
+Ptyas mucosa,local_pain,,,0.066,thalgaspitiya2020bites,"[abstract only] POOLED lesser-medical-importance species, not species-specific: 'five developed mild local pain and swelling' of 76",False
+Lycodon aulicus,local_pain,,,0.066,thalgaspitiya2020bites,"[abstract only] POOLED lesser-medical-importance species, not species-specific: 'five developed mild local pain and swelling' of 76",False
+Fowlea piscator,local_pain,,,0.066,thalgaspitiya2020bites,"[abstract only] POOLED lesser-medical-importance species, not species-specific: 'five developed mild local pain and swelling' of 76",False

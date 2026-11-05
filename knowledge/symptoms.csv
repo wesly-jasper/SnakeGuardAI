@@ -1,0 +1,19 @@
+symptom,marker,definition
+local_pain,local,Pain at the bite site
+local_swelling,local,Swelling confined to the bitten segment of the limb
+progressive_swelling,local,Swelling spreading beyond the bitten segment (e.g. more than half the limb)
+blistering,local,Blisters or bullae near the bite site
+local_necrosis,local,Tissue necrosis at or around the bite site
+regional_lymphadenopathy,local,Tender enlarged lymph nodes draining the bitten limb
+incoagulable_blood,haemotoxic,Incoagulable blood (positive 20-minute whole blood clotting test) or laboratory coagulopathy
+systemic_bleeding,haemotoxic,"Spontaneous systemic bleeding (gums, haematuria, haematemesis, other sites)"
+acute_kidney_injury,haemotoxic,Acute kidney injury (oliguria or rising creatinine)
+shock,haemotoxic,Hypotension or shock
+ptosis,neurotoxic,Drooping of the upper eyelids
+ophthalmoplegia,neurotoxic,External ophthalmoplegia or diplopia
+bulbar_palsy,neurotoxic,"Difficulty swallowing or speaking, pooling of secretions"
+respiratory_paralysis,neurotoxic,Respiratory muscle weakness needing ventilation
+limb_weakness,neurotoxic,Generalised or limb muscle weakness
+abdominal_pain,none,Abdominal pain
+vomiting,none,Vomiting
+headache,none,Headache
