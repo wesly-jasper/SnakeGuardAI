@@ -131,15 +131,19 @@ Research-grade additions (2026-11-06):
 
 Phase 1.4 hardening (2026-11-06). All numbers are SIMULATION results, not clinical validation:
 - Primary dataset is now `configs/sim_v2.yaml` (`experiment_type: primary`): cited onset windows
-  only. The 27 clinical rows with an unknown onset are excluded, never filled. The 0-24 h onset
-  fallback is refused unless a config says `experiment_type: sensitivity`; `sim_v1` is kept as a
-  labelled sensitivity dataset, and every fallback event carries `onset_assumed=true` in events.csv.
+  only, never filled. The 27 clinical rows with a cited frequency but no cited onset are
+  `unknown_onset: label_only`: the symptom occurs at its cited frequency and counts toward the
+  label, but has no onset time (`onset_unknown=true`, hours blank in events.csv) and is never part
+  of the model input. `unknown_onset: exclude` (drop the rows) is a sensitivity variant. The
+  0-24 h onset fallback is refused unless a config says `experiment_type: sensitivity`; `sim_v1`
+  is kept as a labelled sensitivity dataset, and every fallback event carries `onset_assumed=true`.
 - Onset order: violations are counted after the push; partly overlapping windows are redrawn
   (up to `max_order_tries`, same severity and presence) and any remaining violation is flagged
   per patient (`order_violations`), never reported as satisfied. Windows that make an order
   impossible (direct or along a chain) raise an error; cycles in onset_order.csv are rejected.
   sim_v2: 6 rules (5 compatible, 1 partial: krait ophthalmoplegia 0.5-12 h -> bulbar 0.5-7 h);
-  270 krait courses needed a redraw; 0 violations remain.
+  298 krait courses needed a redraw; 0 violations remain. Order rules that involve a label-only
+  sign are not enforced (none apply to the current table).
 - Copula x order diagnostics (`onset_diagnostics.md` per dataset): pre-order onsets pass a KS test
   against Uniform(window) for every symptom (min p = 0.16); ordering moves onset distributions
   by up to KS D = 0.26 (later signs pushed later; conditioning on a partial order pulls the
@@ -156,26 +160,33 @@ Phase 1.4 hardening (2026-11-06). All numbers are SIMULATION results, not clinic
   Current state: 150 rows, 0 verified.
 - Vignettes show only symptoms up to presentation (later events leaked the label).
 - CI: `.github/workflows/tests.yml` runs `python -m src.data.validate` and pytest.
-- sim_v2 rule baseline (test split, n=4,000): accuracy 0.77, macro-F1 0.67, critical error 0.24.
-  Label artefact: 1,681 of 11,454 envenomed (non-dry-bite) patients have no symptom left once
-  unknown-onset rows are excluded (cobra 1,008, saw-scaled viper 407, Russell's viper 266) and get
-  the dry label (`n_envenomed_without_any_symptom` in meta.json). This makes the dry class
-  partly artificial and the critical error rate optimistic; see limitations below.
-- Sensitivity v2 (`configs/sensitivity_v2.yaml`, base sim_v2, 16 variants x 5 seeds x 10k
+- sim_v2 rule baseline (test split, n=4,000): accuracy 0.66, macro-F1 0.57, critical error 0.35.
+  Label artefact resolved: with unknown onsets excluded, 1,681 of 11,454 envenomed (non-dry-bite)
+  patients had no symptom and got the dry label (cobra 1,008, saw-scaled viper 407, Russell's
+  viper 266). With label-only rows this falls to 48 (`n_envenomed_without_any_symptom`), which are
+  genuine all-absent draws. Labels now match the fallback datasets exactly (43.0% dry in both);
+  only what the model can see differs.
+- Sensitivity v2 (`configs/sensitivity_v2.yaml`, base sim_v2, 17 variants x 5 seeds x 10k
   patients; mean [95% t-interval across seeds]; critical error rate):
-  - base (evidence): 0.253 [0.245, 0.261]; macro-F1 0.653 [0.643, 0.664]
-  - assumption, onset fallback 0-12 / 0-24 / 0-48 h: 0.291 / 0.319 / 0.338
-  - assumption, severity correlation 0 / 0.8: 0.260 / 0.240 (intervals overlap the base)
-  - cited-alternative delay, Sri Lankan paediatric profile: 0.421 [0.410, 0.432]
-  - assumption, old uniform 0.5-24 h delay: 0.077 (the placeholder made the task look easy)
-  - cited-alternative Echis (Rajasthan): 0.223; Russell's viper dry 50% (WHO): 0.245
-  - no effect in the evidence-only base: cobra coagulopathy (its row has no cited onset, so it is
-    already excluded), syndrome precedence, open delay bin 48 vs 72 h.
+  - base (evidence, label-only): 0.351 [0.335, 0.367]; macro-F1 0.576 [0.564, 0.588]
+  - evidence, unknown onsets excluded: 0.253 [0.245, 0.261] (optimistic: mislabelled dry class)
+  - assumption, onset fallback 0-12 / 0-24 / 0-48 h: 0.291 / 0.319 / 0.338 (same labels as the
+    base; assumed timing makes some label-only signs visible)
+  - assumption, severity correlation 0 / 0.8: 0.338 / 0.351 (intervals overlap the base)
+  - cited-alternative delay, Sri Lankan paediatric profile: 0.495 [0.471, 0.519]
+  - assumption, old uniform 0.5-24 h delay: 0.204
+  - cited-alternative Echis (Rajasthan): 0.308; Russell's viper dry 50% (WHO): 0.344;
+    krait dry 8/33: 0.362; cobra without coagulopathy: 0.358
+  - no effect: syndrome precedence, open delay bin 48 vs 72 h.
+  The label-only base is a conservative (pessimistic) bound: in reality some signs with
+  unknown timing would be visible at presentation. The fallback variants show how much an
+  assumed timing would change that.
 
 Scientific limitations (Phase 1.4):
-- Excluding unknown onsets removes cited symptoms entirely, which mislabels about 15% of
-  envenomed patients as dry; filling them (sim_v1) invents timing. Neither is evidence; a third
-  option (count the symptom for the label, hide it from the model input) needs a decision.
+- 27 cited symptoms (mostly local signs of cobra, Russell's viper, Echis and Hypnale, plus
+  cobra coagulopathy and kidney injury) have no cited onset. In the primary dataset they count
+  toward the label but are never visible to the model, which understates what a clinician would
+  see at presentation; cited onset windows for these rows are the main evidence gap.
 - Order redraws condition onsets on the order, so the cited windows hold but marginals within
   them shift (quantified in onset_diagnostics.md, not removed).
 - Severity correlation, uniform-within-window onsets, uniform-within-bin delays, the 48 h open

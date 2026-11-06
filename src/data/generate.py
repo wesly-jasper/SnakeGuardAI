@@ -14,6 +14,11 @@ Writes to the config's `output_dir`:
 settings such as `onset_fallback` are refused unless the config says
 `experiment_type: sensitivity`.
 
+`unknown_onset` says what happens to clinical rows with a cited frequency but no cited onset
+window: `exclude` (default; drop the row), `label_only` (the symptom occurs and counts toward
+the label, but has no onset time and is never observed by the model), or `fallback` (fill
+the window from `onset_fallback`; the default when `onset_fallback` is set).
+
 All outputs are SIMULATION data.
 """
 
@@ -44,6 +49,7 @@ from src.data.report import baseline_metrics, build_report, rule_predictions
 from src.data.simulator import (
     DEFAULT_MAX_ORDER_TRIES,
     DEFAULT_PRECEDENCE,
+    UNKNOWN_ONSET_MODES,
     SpeciesSpec,
     assign_splits,
     build_specs,
@@ -57,6 +63,7 @@ from src.data.simulator import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SPLITS = {"train": 0.6, "calibration": 0.2, "test": 0.2}
 PRIMARY, SENSITIVITY = "primary", "sensitivity"
+FALLBACK = "fallback"
 
 
 def load_config(path: str | Path) -> dict[str, Any]:
@@ -131,8 +138,18 @@ def experiment_type(config: dict[str, Any], fallback: tuple[float, float] | None
     return kind
 
 
+def unknown_onset_mode(config: dict[str, Any], fallback: tuple[float, float] | None) -> str:
+    """`exclude`, `label_only` or `fallback`, checked against `onset_fallback`."""
+    mode = config.get("unknown_onset", FALLBACK if fallback is not None else "exclude")
+    if mode not in UNKNOWN_ONSET_MODES | {FALLBACK}:
+        raise ValueError(f"unknown_onset must be one of {sorted(UNKNOWN_ONSET_MODES | {FALLBACK})}")
+    if (mode == FALLBACK) != (fallback is not None):
+        raise ValueError("unknown_onset: fallback needs onset_fallback, and onset_fallback needs unknown_onset: fallback")
+    return mode
+
+
 def assumptions(
-    config: dict[str, Any], fallback: tuple[float, float] | None, specs: dict[str, SpeciesSpec]
+    config: dict[str, Any], fallback: tuple[float, float] | None, specs: dict[str, SpeciesSpec], mode: str,
 ) -> list[str]:
     """Simulation assumptions (not clinical evidence) in force for this dataset."""
     items = [
@@ -142,8 +159,14 @@ def assumptions(
         "GPS and month uniform (placeholder until the Phase 3 geo prior)",
         "hour of day uniform within the cited day/night half",
     ]
-    if fallback is not None:
+    if mode == FALLBACK:
         items.append(f"ASSUMPTION: onset_fallback window {fallback} h for rows with unknown onset")
+    elif mode == "label_only":
+        items.append(
+            "symptoms with unknown onset occur at their cited frequency and count toward the label, "
+            "but have no onset time and are never part of the model input (treated as not yet "
+            "recognised at presentation)"
+        )
     else:
         items.append("rows with unknown onset are excluded, so those symptoms never occur")
     delay = config.get("presentation_delay")
@@ -165,6 +188,8 @@ def generate(config: dict[str, Any]) -> Path:
     knowledge_dir = resolve(config.get("knowledge_dir", "knowledge"))
     fallback = onset_fallback(config, knowledge_dir)
     kind = experiment_type(config, fallback)
+    mode = unknown_onset_mode(config, fallback)
+    sim_mode = "exclude" if mode == FALLBACK else mode
     kb = load_knowledge(
         knowledge_dir,
         require_citations=config.get("require_citations", False),
@@ -187,6 +212,7 @@ def generate(config: dict[str, Any]) -> Path:
         severity_correlation=rho,
         presentation_delay=delay,
         max_order_tries=max_tries,
+        unknown_onset=sim_mode,
     )
     table = to_dataframe(patients)
     table["split"] = assign_splits(len(patients), config.get("splits", DEFAULT_SPLITS), int(config["seed"]))
@@ -197,7 +223,7 @@ def generate(config: dict[str, Any]) -> Path:
     events = events_dataframe(patients)
     events.to_csv(out / "events.csv", index=False)
 
-    specs = build_specs(kb, fallback)
+    specs = build_specs(kb, fallback, sim_mode)
     n_diag = check_count(config.get("diagnostics_n_per_species", 2000), "diagnostics_n_per_species")
     marginals, pairs = onset_diagnostics(specs, n_diag, int(config["seed"]), rho, max_tries)
     (out / "onset_diagnostics.md").write_text(render_diagnostics(marginals, pairs, n_diag), encoding="utf-8")
@@ -219,13 +245,16 @@ def generate(config: dict[str, Any]) -> Path:
         "verification": verification,
         "n_rows_unverified": sum(t["unverified"] for t in verification.values()),
         "require_verified": bool(config.get("require_verified", False)),
-        "assumptions": assumptions(config, fallback, specs),
+        "unknown_onset": mode,
+        "assumptions": assumptions(config, fallback, specs, mode),
         "n_patients": len(patients),
-        "n_clinical_rows_using_onset_fallback": n_unknown if fallback else 0,
-        "n_clinical_rows_excluded_unknown_onset": 0 if fallback else n_unknown,
+        "n_clinical_rows_using_onset_fallback": n_unknown if mode == FALLBACK else 0,
+        "n_clinical_rows_excluded_unknown_onset": n_unknown if mode == "exclude" else 0,
+        "n_clinical_rows_label_only": n_unknown if mode == "label_only" else 0,
         "n_events_with_assumed_onset": int(events["onset_assumed"].sum()) if len(events) else 0,
-        # Envenomed (not dry-bite) patients whose sampled course is empty: with unknown-onset
-        # rows excluded, these get the dry label although the bite was not dry (label artefact).
+        "n_events_with_unknown_onset": int(events["onset_unknown"].sum()) if len(events) else 0,
+        # Envenomed (not dry-bite) patients whose sampled course is empty: they get the dry label
+        # although the bite was not dry (a label artefact, large when unknown onsets are excluded).
         "n_envenomed_without_any_symptom": sum(
             1 for p in patients if specs[p.species].venomous and not p.dry_bite and not p.course
         ),
@@ -242,7 +271,8 @@ def generate(config: dict[str, Any]) -> Path:
     }
     (out / "meta.json").write_text(json.dumps(meta, indent=2, default=str), encoding="utf-8")
     if patients:
-        report = build_report(patients, table["split"].tolist(), kb, precedence, report_notes(meta, config, fallback, delay))
+        notes = report_notes(meta, config, fallback, delay)
+        report = build_report(patients, table["split"].tolist(), kb, precedence, notes)
         (out / "report.md").write_text(report, encoding="utf-8")
     return out
 
@@ -255,12 +285,16 @@ def report_notes(
     return [
         f"config `{config['name']}` ({meta['experiment_type']} experiment), seed {config['seed']}, "
         f"commit `{meta['git_commit']}`",
-        (f"ASSUMPTION: {meta['n_clinical_rows_using_onset_fallback']} clinical row(s) use the fallback "
-         f"onset window {fallback}" if fallback
-         else f"{meta['n_clinical_rows_excluded_unknown_onset']} clinical row(s) with unknown onset excluded"),
+        {
+            FALLBACK: f"ASSUMPTION: {meta['n_clinical_rows_using_onset_fallback']} clinical row(s) use the "
+                      f"fallback onset window {fallback}",
+            "label_only": f"{meta['n_clinical_rows_label_only']} clinical row(s) with unknown onset are label-only "
+                          f"({meta['n_events_with_unknown_onset']} events count toward labels, never observed)",
+            "exclude": f"{meta['n_clinical_rows_excluded_unknown_onset']} clinical row(s) with unknown onset excluded",
+        }[meta["unknown_onset"]],
         f"{meta['n_rows_unverified']} knowledge row(s) not yet human-verified ({verification})",
         f"{meta['n_envenomed_without_any_symptom']} envenomed (non-dry-bite) patient(s) have no symptom in "
-        "their course and are labelled non-venomous/dry (label artefact of excluding unknown onsets)",
+        "their course and are labelled non-venomous/dry (label artefact)",
         f"{meta['n_patients_with_order_violations']} patient(s) still violate an onset order "
         "(see onset_diagnostics.md)",
         (f"presentation delay: cited profile `{config['presentation_delay']['profile']}` "

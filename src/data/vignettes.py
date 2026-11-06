@@ -93,7 +93,7 @@ def build_kit(
         source, patient, events = rows[i]
         vid = f"V{number:03d}"
         parts += [f"## {vid}", "", describe(pd.Series(patient), events, names), ""]
-        later = int((events["hours"] > patient["presentation_hours"]).sum())
+        later = int((~(events["hours"] <= patient["presentation_hours"])).sum())  # incl. unknown onset
         key.append((vid, source, patient["patient_id"], patient.get("species"), patient.get("venom_syndrome"), later))
     form = pd.DataFrame([(k[0], "", "", "", "") for k in key], columns=RATING_COLUMNS)
     answer = pd.DataFrame(

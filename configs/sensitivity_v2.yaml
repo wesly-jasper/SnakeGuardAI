@@ -7,8 +7,12 @@ n_patients: 10000
 seeds: [42, 43, 44, 45, 46]
 variants:
   - name: base
-    description: sim_v2 defaults (cited onsets only)
+    description: sim_v2 defaults (cited onsets only; unknown-onset symptoms label-only)
     basis: evidence
+  - name: exclude_unknown_onset
+    description: unknown-onset symptoms dropped entirely (they never occur)
+    basis: evidence
+    set: {unknown_onset: exclude}
   - name: independent
     description: severity_correlation 0 (independent symptoms)
     basis: assumption
@@ -20,15 +24,15 @@ variants:
   - name: assumption_fallback_12h
     description: ASSUMPTION unknown onsets filled with 0-12 h
     basis: assumption
-    set: {onset_fallback: {hours: [0, 12], source_key: mohfw2017stg}}
+    set: {unknown_onset: fallback, onset_fallback: {hours: [0, 12], source_key: mohfw2017stg}}
   - name: assumption_fallback_24h
     description: ASSUMPTION unknown onsets filled with 0-24 h (mohfw2017stg 24 h observation rule; = sim_v1)
     basis: assumption
-    set: {onset_fallback: {hours: [0, 24], source_key: mohfw2017stg}}
+    set: {unknown_onset: fallback, onset_fallback: {hours: [0, 24], source_key: mohfw2017stg}}
   - name: assumption_fallback_48h
     description: ASSUMPTION unknown onsets filled with 0-48 h
     basis: assumption
-    set: {onset_fallback: {hours: [0, 48], source_key: mohfw2017stg}}
+    set: {unknown_onset: fallback, onset_fallback: {hours: [0, 48], source_key: mohfw2017stg}}
   - name: neuro_first
     description: neurotoxic wins over haemotoxic in mixed courses
     basis: assumption

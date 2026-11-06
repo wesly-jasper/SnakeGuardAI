@@ -20,8 +20,14 @@ distribution (src/data/presentation.py); without one it is uniform over
 `presentation_hours_range`.
 
 Onset windows: rows with a cited window are used as cited. Rows whose window is unknown are
-dropped unless an `onset_fallback` window is given; fallback onsets are an ASSUMPTION and
-every event they produce carries `onset_assumed=True`.
+handled by `unknown_onset`:
+- "exclude": the row is dropped (its symptom never occurs);
+- "label_only": presence is sampled with the cited frequency and counts toward the
+  venom-syndrome label, but the event has no onset time (`onset_unknown=True`, hours NaN)
+  and is never observed by the model;
+- an `onset_fallback` window instead fills the bounds; fallback onsets are an ASSUMPTION
+  and every event they produce carries `onset_assumed=True`.
+Order rules involving a sign with unknown onset are not enforced.
 
 Dependence between symptoms (modelling assumption, varied in the sensitivity analysis):
 a latent severity z ~ N(0, 1) per patient enters a Gaussian copula with correlation
@@ -77,6 +83,7 @@ class SymptomEvent:
     symptom: str
     hours: float
     onset_assumed: bool = False  # True when the onset came from the fallback window
+    onset_unknown: bool = False  # True for label-only events: present, onset time unknown (NaN)
 
 
 @dataclass(frozen=True)
@@ -96,8 +103,8 @@ class SyntheticPatient:
 
     @property
     def observed_events(self) -> tuple[SymptomEvent, ...]:
-        """Events visible to the model: those at or before presentation."""
-        return tuple(e for e in self.course if e.hours <= self.presentation_hours)
+        """Events visible to the model: those with a known onset at or before presentation."""
+        return tuple(e for e in self.course if not e.onset_unknown and e.hours <= self.presentation_hours)
 
 
 @dataclass(frozen=True)
@@ -115,6 +122,7 @@ class SpeciesSpec:
     order: tuple[tuple[int, int], ...] = ()
     onset_assumed: np.ndarray | None = None
     joint_context: tuple[tuple[Cell, ...], np.ndarray] | None = None
+    onset_unknown: np.ndarray | None = None
 
 
 @dataclass(frozen=True)
@@ -129,21 +137,31 @@ class CourseDraw:
     order_redraws: int
 
 
-def fill_onsets(
-    clinical: pd.DataFrame, fallback: tuple[float, float] | None
-) -> pd.DataFrame:
-    """Fill blank onset bounds from `fallback` (lo, hi); without one, drop such rows.
+UNKNOWN_ONSET_MODES: frozenset[str] = frozenset({"exclude", "label_only"})
 
-    Adds `onset_assumed` (True where any bound came from the fallback).
+
+def fill_onsets(
+    clinical: pd.DataFrame, fallback: tuple[float, float] | None, unknown_onset: str = "exclude"
+) -> pd.DataFrame:
+    """Handle blank onset bounds: fill from `fallback` (lo, hi), else per `unknown_onset`.
+
+    Adds `onset_assumed` (bounds from the fallback) and `onset_unknown` (label-only rows,
+    bounds left blank).
     """
+    if unknown_onset not in UNKNOWN_ONSET_MODES:
+        raise ValueError(f"unknown_onset must be one of {sorted(UNKNOWN_ONSET_MODES)}")
     blank = clinical[["onset_min_hours", "onset_max_hours"]].isna().any(axis=1)
+    if fallback is None and unknown_onset == "label_only":
+        kept = clinical.copy()
+        kept.loc[blank, ["onset_min_hours", "onset_max_hours"]] = np.nan  # a lone bound is not a window
+        return kept.assign(onset_assumed=False, onset_unknown=blank)
     if fallback is None:
-        return clinical[~blank].assign(onset_assumed=False)
+        return clinical[~blank].assign(onset_assumed=False, onset_unknown=False)
     filled = clinical.copy()
     filled["onset_min_hours"] = filled["onset_min_hours"].fillna(fallback[0])
     filled["onset_max_hours"] = filled["onset_max_hours"].fillna(fallback[1])
     filled["onset_max_hours"] = filled[["onset_min_hours", "onset_max_hours"]].max(axis=1)
-    return filled.assign(onset_assumed=blank)
+    return filled.assign(onset_assumed=blank, onset_unknown=False)
 
 
 def count_fallback_rows(kb: KnowledgeBase) -> int:
@@ -153,10 +171,14 @@ def count_fallback_rows(kb: KnowledgeBase) -> int:
 
 
 def order_pairs(
-    onset_order: pd.DataFrame, species: str, symptoms: tuple[str, ...]
+    onset_order: pd.DataFrame, species: str, symptoms: tuple[str, ...],
+    timed: Sequence[bool] | None = None,
 ) -> tuple[tuple[int, int], ...]:
-    """(before, after) index pairs into `symptoms` that apply to `species`."""
-    index = {s: i for i, s in enumerate(symptoms)}
+    """(before, after) index pairs into `symptoms` that apply to `species`.
+
+    With `timed`, symptoms whose entry is False (onset unknown) are left out.
+    """
+    index = {s: i for i, s in enumerate(symptoms) if timed is None or timed[i]}
     return tuple(
         (index[b], index[a]) for b, a in order_edges(onset_order, species) if b in index and a in index
     )
@@ -234,16 +256,16 @@ def joint_cells(joint: pd.DataFrame, species: str) -> tuple[tuple[Cell, ...], np
 
 
 def build_specs(
-    kb: KnowledgeBase, onset_fallback: tuple[float, float] | None = None
+    kb: KnowledgeBase, onset_fallback: tuple[float, float] | None = None, unknown_onset: str = "exclude"
 ) -> dict[str, SpeciesSpec]:
     """One SpeciesSpec per usable species, sorted by name.
 
     Venomous species without clinical rows are skipped (they could only produce
     mislabelled all-dry patients); non-venomous species may have no rows. Blank onset
-    bounds are filled from `onset_fallback`, or the row is dropped when it is None.
+    bounds are filled from `onset_fallback`, or handled per `unknown_onset` when it is None.
     Raises if an onset order is impossible given the windows.
     """
-    clinical = fill_onsets(kb.clinical[kb.clinical["frequency"] > 0], onset_fallback)
+    clinical = fill_onsets(kb.clinical[kb.clinical["frequency"] > 0], onset_fallback, unknown_onset)
     specs: dict[str, SpeciesSpec] = {}
     skipped = []
     for row in kb.species.sort_values("species").itertuples():
@@ -254,6 +276,7 @@ def build_specs(
             continue
         ctx = kb.context[kb.context["species"] == row.species]
         symptoms = tuple(rows["symptom"])
+        unknown = rows["onset_unknown"].to_numpy(dtype=bool)
         specs[row.species] = SpeciesSpec(
             species=row.species,
             venomous=venomous,
@@ -263,9 +286,10 @@ def build_specs(
             onset_max=rows["onset_max_hours"].to_numpy(dtype=float),
             frequency=rows["frequency"].to_numpy(dtype=float),
             context=dict(zip(ctx["feature"], ctx["probability"].astype(float))),
-            order=order_pairs(kb.onset_order, row.species, symptoms),
+            order=order_pairs(kb.onset_order, row.species, symptoms, ~unknown),
             onset_assumed=rows["onset_assumed"].to_numpy(dtype=bool),
             joint_context=joint_cells(kb.context_joint, row.species),
+            onset_unknown=unknown,
         )
     if skipped:
         warnings.warn(f"skipping venomous species with no clinical rows: {skipped}", stacklevel=2)
@@ -342,13 +366,15 @@ def course_events(spec: SpeciesSpec, draw: CourseDraw) -> tuple[SymptomEvent, ..
     """The course's events sorted by onset; empty for a dry bite."""
     if draw.dry:
         return ()
-    assumed = spec.onset_assumed if spec.onset_assumed is not None else np.zeros(len(spec.symptoms), bool)
+    none = np.zeros(len(spec.symptoms), bool)
+    assumed = spec.onset_assumed if spec.onset_assumed is not None else none
+    unknown = spec.onset_unknown if spec.onset_unknown is not None else none
     events = (
-        SymptomEvent(s, float(h), bool(a))
-        for s, h, keep, a in zip(spec.symptoms, draw.onsets, draw.present, assumed)
+        SymptomEvent(s, float("nan") if u else float(h), bool(a), bool(u))
+        for s, h, keep, a, u in zip(spec.symptoms, draw.onsets, draw.present, assumed, unknown)
         if keep
     )
-    return tuple(sorted(events, key=lambda e: e.hours))
+    return tuple(sorted(events, key=lambda e: (e.onset_unknown, e.hours)))
 
 
 def sample_course(
@@ -456,13 +482,14 @@ def simulate_patients(
     severity_correlation: float = 0.0,
     presentation_delay: DelayDistribution | None = None,
     max_order_tries: int = DEFAULT_MAX_ORDER_TRIES,
+    unknown_onset: str = "exclude",
 ) -> list[SyntheticPatient]:
     """Sample `n` synthetic patients. Species are uniform unless weights are given."""
     n = check_count(n)
     _check_correlation(severity_correlation)
     if presentation_delay is None:
         DelayDistribution.uniform(*presentation_hours_range)  # validates the range
-    specs = build_specs(kb, onset_fallback)
+    specs = build_specs(kb, onset_fallback, unknown_onset)
     if not specs:
         raise ValueError("knowledge base has no usable species")
     rng = np.random.default_rng(seed)
@@ -509,6 +536,7 @@ def to_dataframe(patients: list[SyntheticPatient]) -> pd.DataFrame:
             "asleep": p.asleep,
             "order_violations": p.order_violations,
             "n_assumed_onsets": sum(e.onset_assumed for e in p.course),
+            "n_unknown_onsets": sum(e.onset_unknown for e in p.course),
         }
         record.update({f"onset_{e.symptom}": e.hours for e in p.observed_events})
         records.append(record)
@@ -516,11 +544,14 @@ def to_dataframe(patients: list[SyntheticPatient]) -> pd.DataFrame:
 
 
 def events_dataframe(patients: list[SyntheticPatient]) -> pd.DataFrame:
-    """Long format: one row per course event, with `observed` = seen by presentation and
-    `onset_assumed` = onset from the fallback window rather than a cited window."""
+    """Long format: one row per course event, with `observed` = seen by presentation,
+    `onset_assumed` = onset from the fallback window rather than a cited window and
+    `onset_unknown` = label-only event without an onset time (hours blank)."""
     rows = [
-        (pid, e.symptom, e.hours, e.hours <= p.presentation_hours, e.onset_assumed)
+        (pid, e.symptom, e.hours, e in p.observed_events, e.onset_assumed, e.onset_unknown)
         for pid, p in enumerate(patients)
         for e in p.course
     ]
-    return pd.DataFrame(rows, columns=["patient_id", "symptom", "hours", "observed", "onset_assumed"])
+    return pd.DataFrame(
+        rows, columns=["patient_id", "symptom", "hours", "observed", "onset_assumed", "onset_unknown"]
+    )

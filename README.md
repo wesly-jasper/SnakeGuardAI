@@ -67,7 +67,9 @@ python -m src.data.generate --config configs/sim_v2.yaml # primary, evidence-onl
 
 Writes `patients.csv`, `events.csv`, `meta.json`, a sanity `report.md` (with a rule-based
 syndromic baseline) and `onset_diagnostics.md` to `data/processed/sim_v2/`. `sim_v2` is the
-primary dataset: it uses cited onset windows only (`experiment_type: primary`). Filling unknown
+primary dataset: it uses cited onset windows only (`experiment_type: primary`). Symptoms with a
+cited frequency but no cited onset are label-only (`unknown_onset: label_only`): they count toward
+the venom-syndrome label but have no onset time and are never part of the model input. Filling unknown
 onsets with an assumed window (`onset_fallback`) is refused unless a config says
 `experiment_type: sensitivity` (e.g. `configs/sim_v1.yaml`, kept as a labelled sensitivity
 dataset). `meta.json` records the git commit, knowledge-file hashes, verified/unverified rows
@@ -85,7 +87,7 @@ python -m src.data.quotecheck  # checks quotes against open full texts -> docs/q
 Robustness and realism checks (all output is simulation data):
 
 ```bash
-python -m src.data.sensitivity --config configs/sensitivity_v2.yaml   # 16 variants x 5 seeds, 95% CIs
+python -m src.data.sensitivity --config configs/sensitivity_v2.yaml   # 17 variants x 5 seeds, 95% CIs
 python -m src.data.vignettes --dataset data/processed/sim_v2 --n 40 --out data/processed/review_v2
 ```
 

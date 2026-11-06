@@ -38,6 +38,13 @@ def species_diagnostics(
     raw_all = np.array([d.raw_onsets for d in draws]).reshape(n, k)
     marginals = []
     for j, symptom in enumerate(spec.symptoms):
+        if spec.onset_unknown is not None and spec.onset_unknown[j]:
+            marginals.append({
+                "species": spec.species, "symptom": symptom, "window": "unknown (label only)",
+                "onset_assumed": False,
+                "n_present": sum(bool(d.present[j]) for d in envenomed),
+            })
+            continue
         lo, hi = float(spec.onset_min[j]), float(spec.onset_max[j])
         before = np.array([d.raw_onsets[j] for d in envenomed if d.present[j]])
         after = np.array([d.onsets[j] for d in envenomed if d.present[j]])

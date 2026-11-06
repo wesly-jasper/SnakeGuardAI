@@ -41,6 +41,7 @@ def validate(knowledge_dir: Path, require_verified: bool = False) -> dict[str, d
         check_citations(kb.onset_order, bib, "onset_order.csv")
         check_citations(kb.context_joint, bib, "context_joint.csv")
         build_specs(kb, None)
+        build_specs(kb, None, "label_only")
         build_specs(kb, FALLBACK_CHECK)
     delay_path = knowledge_dir / "presentation_delay.csv"
     if delay_path.exists():

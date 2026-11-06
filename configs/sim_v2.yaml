@@ -1,6 +1,8 @@
 # Synthetic patient dataset v2: PRIMARY, evidence-grounded. Output is SIMULATION data.
-# Uses only cited onset windows: clinical rows whose onset is unknown are excluded (no
-# fallback window). Assumption-based variants live in configs/sensitivity_v2.yaml.
+# Uses only cited onset windows. Clinical rows with a cited frequency but no cited onset are
+# label-only: the symptom occurs at its cited frequency and counts toward the venom-syndrome
+# label, but gets no onset time and is never part of the model input (no fallback window).
+# Assumption-based variants live in configs/sensitivity_v2.yaml.
 name: sim_v2
 experiment_type: primary
 seed: 42
@@ -18,7 +20,8 @@ syndrome_precedence: [haemotoxic, neurotoxic]
 # Shared latent severity (Gaussian copula). Modelling assumption with no cited value yet:
 # 0 = independent symptoms. Varied 0-0.8 in configs/sensitivity_v2.yaml.
 severity_correlation: 0.5
-onset_fallback: null           # unknown onsets are excluded, never filled, in the primary dataset
+unknown_onset: label_only      # exclude | label_only (fallback only in sensitivity configs)
+onset_fallback: null           # unknown onsets are never filled in the primary dataset
 max_order_tries: 100           # redraws for onset orders the push alone cannot satisfy
 diagnostics_n_per_species: 2000
 splits: {train: 0.6, calibration: 0.2, test: 0.2}
