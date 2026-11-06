@@ -45,6 +45,7 @@ The knowledge base in `knowledge/` (loaded by `src/data/knowledge.py`):
 | `species.csv` | species | `group` (venomous / non-venomous), `dry_bite_rate` |
 | `clinical_table.csv` | (species, symptom) | `onset_min_hours`, `onset_max_hours`, `frequency` |
 | `context_table.csv` | (species, feature) | `feature` (night / indoor / asleep), `probability` |
+| `presentation_delay.csv` | (profile, delay bin) | `min_hours`, `max_hours` (blank = open), `proportion` |
 
 Every numeric row also has `source_key` (one or more BibTeX keys from `sources.bib`,
 separated by `;`), `evidence` (locator + short verbatim quote) and `verified` (true only

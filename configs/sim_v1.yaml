@@ -4,7 +4,13 @@ seed: 42
 n_patients: 20000
 knowledge_dir: knowledge
 output_dir: data/processed/sim_v1
-presentation_hours: [0.5, 24.0]
+# Bite-to-presentation delay: cited bins from knowledge/presentation_delay.csv.
+# kerala_adult = sajeethkumar2018clinical (n=1,500, North Kerala). The '> 24 h' bin has no
+# reported upper bound; open_bin_max_hours is an assumption (varied in sensitivity_v1).
+presentation_delay:
+  profile: kerala_adult
+  open_bin_max_hours: 48
+presentation_hours: [0.5, 24.0]  # used only when presentation_delay is null (old placeholder)
 species_weights: null          # uniform until a cited epidemiological mix is chosen
 syndrome_precedence: [haemotoxic, neurotoxic]
 # Shared latent severity (Gaussian copula). Modelling assumption with no cited value yet:

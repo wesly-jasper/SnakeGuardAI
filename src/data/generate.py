@@ -23,6 +23,7 @@ from typing import Any
 import yaml
 
 from src.data.knowledge import apply_overrides, load_knowledge, read_bib_keys, split_keys
+from src.data.presentation import DelayDistribution, load_delay
 from src.data.report import baseline_metrics, build_report, rule_predictions
 from src.data.simulator import (
     DEFAULT_PRECEDENCE,
@@ -85,6 +86,14 @@ def onset_fallback(config: dict[str, Any], knowledge_dir: Path) -> tuple[float, 
     return lo, hi
 
 
+def presentation_delay(config: dict[str, Any], knowledge_dir: Path) -> DelayDistribution | None:
+    """The cited delay distribution from `config['presentation_delay']`, or None (uniform range)."""
+    spec = config.get("presentation_delay")
+    if not spec:
+        return None
+    return load_delay(knowledge_dir, spec["profile"], float(spec["open_bin_max_hours"]))
+
+
 def generate(config: dict[str, Any]) -> Path:
     """Simulate patients per `config` and write the dataset; returns the output dir."""
     knowledge_dir = resolve(config.get("knowledge_dir", "knowledge"))
@@ -97,6 +106,7 @@ def generate(config: dict[str, Any]) -> Path:
     )
     kb = apply_overrides(kb, config.get("knowledge_overrides"))
     precedence = tuple(config.get("syndrome_precedence", DEFAULT_PRECEDENCE))
+    delay = presentation_delay(config, knowledge_dir)
     patients = simulate_patients(
         kb,
         n=int(config["n_patients"]),
@@ -106,6 +116,7 @@ def generate(config: dict[str, Any]) -> Path:
         precedence=precedence,
         onset_fallback=fallback,
         severity_correlation=float(config.get("severity_correlation", 0.0)),
+        presentation_delay=delay,
     )
     table = to_dataframe(patients)
     table["split"] = assign_splits(len(patients), config.get("splits", DEFAULT_SPLITS), int(config["seed"]))
@@ -128,6 +139,10 @@ def generate(config: dict[str, Any]) -> Path:
         "knowledge_hashes": file_hashes(knowledge_dir),
         "n_patients": len(patients),
         "n_clinical_rows_using_onset_fallback": n_fallback,
+        "presentation_hours_summary": (
+            table["presentation_hours"].describe(percentiles=[0.25, 0.5, 0.75]).round(2).to_dict()
+            if len(table) else {}
+        ),
         "n_rows_unverified": int((~kb.clinical["verified"]).sum() + (~kb.context["verified"]).sum()),
         "syndrome_counts": table["venom_syndrome"].value_counts().to_dict() if len(table) else {},
         "rule_baseline_test": baseline,
@@ -138,6 +153,8 @@ def generate(config: dict[str, Any]) -> Path:
             f"config `{config['name']}`, seed {config['seed']}, commit `{meta['git_commit']}`",
             f"{n_fallback} clinical row(s) use the fallback onset window {fallback}" if fallback else "no onset fallback",
             f"{meta['n_rows_unverified']} knowledge row(s) not yet human-verified",
+            (f"presentation delay: cited profile `{config['presentation_delay']['profile']}`"
+             if delay else f"presentation delay: uniform {config.get('presentation_hours', (0.5, 24.0))} h (uncited)"),
         ]
         report = build_report(patients, table["split"].tolist(), kb, precedence, notes)
         (out / "report.md").write_text(report, encoding="utf-8")

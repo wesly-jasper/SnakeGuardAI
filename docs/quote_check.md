@@ -15,14 +15,14 @@ plus any bib key named in the evidence. `abstract` sources only contain the abst
 
 | status | rows |
 |---|---|
-| found | 39 |
+| found | 53 |
 | partial | 7 |
 | not_found | 15 |
 | no_quote | 19 |
 | source_unavailable | 0 |
-| **total** | **80** |
+| **total** | **94** |
 
-## found (39)
+## found (53)
 
 | table | item | source(s) | fragment(s) missing |
 |---|---|---|---|
@@ -65,6 +65,20 @@ plus any bib key named in the evidence. `abstract` sources only contain the abst
 | species.csv | Daboia russelii / dry_bite_rate | kularatne2014revisiting (fulltext), who2016guidelines (pdf) | - |
 | species.csv | Echis carinatus / dry_bite_rate | who2016guidelines (pdf) | - |
 | species.csv | Hypnale hypnale / dry_bite_rate | ariaratnam2008frequent (pdf) | - |
+| presentation_delay.csv | kerala_adult / 0-1 h | sajeethkumar2018clinical (fulltext) | - |
+| presentation_delay.csv | kerala_adult / 1-6 h | sajeethkumar2018clinical (fulltext) | - |
+| presentation_delay.csv | kerala_adult / 6-24 h | sajeethkumar2018clinical (fulltext) | - |
+| presentation_delay.csv | kerala_adult / 24-open h | sajeethkumar2018clinical (fulltext) | - |
+| presentation_delay.csv | kerala_adult_cumulative / 0-1 h | sajeethkumar2018clinical (fulltext) | - |
+| presentation_delay.csv | kerala_adult_cumulative / 1-6 h | sajeethkumar2018clinical (fulltext) | - |
+| presentation_delay.csv | kerala_adult_cumulative / 6-24 h | sajeethkumar2018clinical (fulltext) | - |
+| presentation_delay.csv | kerala_adult_cumulative / 24-open h | sajeethkumar2018clinical (fulltext) | - |
+| presentation_delay.csv | srilanka_paediatric_hnpv / 0-1 h | rathnayaka2022epidemiological (fulltext) | - |
+| presentation_delay.csv | srilanka_paediatric_hnpv / 1-2 h | rathnayaka2022epidemiological (fulltext) | - |
+| presentation_delay.csv | srilanka_paediatric_hnpv / 2-4 h | rathnayaka2022epidemiological (fulltext) | - |
+| presentation_delay.csv | srilanka_paediatric_hnpv / 4-6 h | rathnayaka2022epidemiological (fulltext) | - |
+| presentation_delay.csv | srilanka_paediatric_hnpv / 6-8 h | rathnayaka2022epidemiological (fulltext) | - |
+| presentation_delay.csv | srilanka_paediatric_hnpv / 8-open h | rathnayaka2022epidemiological (fulltext) | - |
 
 ## partial (7)
 

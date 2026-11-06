@@ -14,7 +14,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.data.knowledge import load_knowledge, split_keys
+from src.data.knowledge import load_knowledge, read_table, split_keys
+from src.data.presentation import DELAY_COLUMNS
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -36,6 +37,14 @@ def unverified_rows(knowledge_dir: Path) -> pd.DataFrame:
         kb.context.assign(table="context_table.csv", item=kb.context["species"] + " / " + kb.context["feature"],
                           value=kb.context["probability"].map(str)),
     ]
+    delay_path = knowledge_dir / "presentation_delay.csv"
+    if delay_path.exists():
+        delay = read_table(delay_path, DELAY_COLUMNS)
+        parts.append(delay.assign(
+            table="presentation_delay.csv",
+            item=delay["profile"] + " / " + delay["min_hours"].map(str) + "-" + delay["max_hours"].map(lambda v: "open" if pd.isna(v) else str(v)) + " h",
+            value=delay["proportion"].map(str),
+        ))
     rows = pd.concat([p[~p["verified"]][["source_key", "table", "item", "value", "evidence"]] for p in parts])
     rows = rows.assign(source=rows["source_key"].map(lambda k: (split_keys(k) or ["(none)"])[0]))
     return rows.sort_values(["source", "table", "item"]).reset_index(drop=True)

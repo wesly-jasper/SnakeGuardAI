@@ -10,8 +10,11 @@ whole course, while the model only sees events up to presentation (`observed_eve
 Placeholders until later phases:
 - GPS is uniform over India's bounding box and month is uniform. The real
   P(species | location, month) prior comes from GBIF occurrences in Phase 3.
-- Time to presentation is uniform over `presentation_hours_range`.
 - Context features (night, indoor, asleep) are sampled independently per species.
+
+Time to presentation is drawn from `presentation_delay`, a cited piecewise-uniform
+distribution (src/data/presentation.py); without one it is uniform over
+`presentation_hours_range`.
 
 Dependence between symptoms (modelling assumption, varied in the sensitivity analysis):
 a latent severity z ~ N(0, 1) per patient enters a Gaussian copula with correlation
@@ -35,6 +38,7 @@ import pandas as pd
 from scipy.special import ndtr, ndtri
 
 from src.data.knowledge import ALL_SPECIES, KnowledgeBase
+from src.data.presentation import DelayDistribution
 
 SYNDROMES: tuple[str, ...] = ("neurotoxic", "haemotoxic", "local-only", "non-venomous/dry")
 DRY_LABEL = "non-venomous/dry"
@@ -253,8 +257,10 @@ def simulate_patient(
     presentation_hours_range: tuple[float, float] = (0.5, 24.0),
     precedence: Sequence[str] = DEFAULT_PRECEDENCE,
     severity_correlation: float = 0.0,
+    presentation_delay: DelayDistribution | None = None,
 ) -> SyntheticPatient:
     """Sample one patient bitten by `spec.species`."""
+    delay = presentation_delay or DelayDistribution.uniform(*presentation_hours_range)
     dry, course = sample_course(spec, rng, severity_correlation)
     hour, indoor, asleep = sample_context(spec.context, rng)
     return SyntheticPatient(
@@ -262,7 +268,7 @@ def simulate_patient(
         venom_syndrome=derive_syndrome((e.symptom for e in course), marker_of, spec.venomous, precedence),
         dry_bite=dry,
         course=course,
-        presentation_hours=float(rng.uniform(*presentation_hours_range)),
+        presentation_hours=delay.sample(rng),
         lat=float(rng.uniform(*INDIA_LAT_RANGE)),
         lon=float(rng.uniform(*INDIA_LON_RANGE)),
         month=int(rng.integers(1, 13)),
@@ -296,6 +302,7 @@ def simulate_patients(
     precedence: Sequence[str] = DEFAULT_PRECEDENCE,
     onset_fallback: tuple[float, float] | None = None,
     severity_correlation: float = 0.0,
+    presentation_delay: DelayDistribution | None = None,
 ) -> list[SyntheticPatient]:
     """Sample `n` synthetic patients. Species are uniform unless weights are given."""
     specs = build_specs(kb, onset_fallback)
@@ -308,7 +315,8 @@ def simulate_patients(
     marker_of = kb.marker_of()
     return [
         simulate_patient(
-            specs[species[i]], rng, marker_of, presentation_hours_range, precedence, severity_correlation
+            specs[species[i]], rng, marker_of, presentation_hours_range, precedence, severity_correlation,
+            presentation_delay,
         )
         for i in picks
     ]

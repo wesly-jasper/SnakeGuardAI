@@ -94,7 +94,8 @@ Done:
   all rights reserved: ask the authors before use), Silva 2016 Russell's viper myotoxicity
   (all rights reserved), Ratnayake 2019 Russell's viper AKI time course (CC BY 4.0).
 - sim_v1 (20k patients, SIMULATED): simulated rates match table frequencies within 0.03; the
-  rule-based baseline on the test split gives accuracy 0.84, macro-F1 0.80, critical error 9.2%.
+  rule-based baseline on the test split gives accuracy 0.68, macro-F1 0.61, critical error 0.33
+  (cited presentation delay; 0.84 / 0.81 / 0.14 under the old uniform 0.5-24 h placeholder).
 
 Research-grade additions (2026-11-06):
 - Symptom dependence: shared latent severity (Gaussian copula, `severity_correlation`, default
@@ -102,22 +103,35 @@ Research-grade additions (2026-11-06):
 - Cited onset order (`knowledge/onset_order.csv`): ptosis -> ophthalmoplegia -> bulbar ->
   respiratory / limb (mohfw2017stg, silva2016krait); krait abdominal pain before ptosis
   (kularatne1998krait).
-- Automatic quote pre-check (`python -m src.data.quotecheck` -> `docs/quote_check.md`): of 80 rows,
-  39 quotes found in the open full text, 7 partial, 15 not found (mostly abstract-only access),
+- Automatic quote pre-check (`python -m src.data.quotecheck` -> `docs/quote_check.md`): of 94 rows (incl. 14 delay rows),
+  53 quotes found in the open full text, 7 partial, 15 not found (mostly abstract-only access),
   19 without a quote. Not a substitute for human verification.
+- Cited time to presentation (`knowledge/presentation_delay.csv`, loaded by
+  `src/data/presentation.py`): delay bins from sajeethkumar2018clinical (n=1,500, North Kerala:
+  12% < 1 h, 68% 1-6 h, 10% 6-24 h, 6% > 24 h), renormalised and sampled uniformly within each bin.
+  This replaces the uncited uniform 0.5-24 h placeholder. Two readings are cited because the
+  source sentence is ambiguous ('68% within 6 h' disjoint vs cumulative), plus a faster Sri
+  Lankan paediatric profile (rathnayaka2022epidemiological, n=40). The '> 24 h' bin has no
+  reported upper bound; `open_bin_max_hours: 48` is an assumption. sim_v1 presentation: median
+  3.7 h, IQR 1.9-5.4 h.
 - Sensitivity analysis (`python -m src.data.sensitivity --config configs/sensitivity_v1.yaml`,
-  12 variants, SIMULATED, rule-based baseline): critical error rate 0.07-0.33, macro-F1 0.56-0.85.
-  Most influential: time to presentation (uniform 0.5-24 h placeholder; 0.145 -> 0.334 when all
-  present within 6 h), the onset fallback window (0.07-0.19) and severity correlation
-  (0.10-0.18). Dry-bite rates, syndrome precedence, cobra coagulopathy and Echis population
-  each move it by <= 0.03, so those open decisions are robust.
+  16 variants, 10k patients each, SIMULATED, rule-based baseline on the test split):
+  - base (cited delay): accuracy 0.67, macro-F1 0.60, critical error 0.31. With the old uniform
+    placeholder the same baseline gave critical error 0.145: most patients in the cited series
+    present within 6 h, before many systemic signs appear, so the task is much harder than the
+    placeholder suggested.
+  - Delay: disjoint vs cumulative reading 0.309 vs 0.311; open-bin cap 48 vs 72 h no change;
+    faster Sri Lankan paediatric profile 0.47.
+  - Onset fallback window 0.23-0.33; severity correlation 0.26-0.32.
+  - Dry-bite rates, syndrome precedence, cobra coagulopathy and Echis population each move it by
+    <= 0.05.
 - Clinician review kit (`python -m src.data.vignettes`, `docs/clinician_review_protocol.md`):
   blinded vignettes, rating form, answer key; can mix in real cases for a real-vs-simulated test.
-- Tests: 80, passing on system Python (pandas 2.3) and the project .venv (pandas 3.1).
+- Tests: 90, passing on system Python (pandas 2.3) and the project .venv (pandas 3.1).
 
 Next evidence priorities (from the sensitivity analysis):
-1. A cited bite-to-presentation distribution (most series report it) to replace the uniform
-   0.5-24 h placeholder.
+1. Done: cited bite-to-presentation distribution (see above). Still open: a delay series from a
+   second Indian region (e.g. pushpalatha2024study, not yet extracted) and per-species delays.
 2. Real onset times (Silva 2016 krait dataset with permission; Ratnayake 2019 AKI, CC BY) to
    shrink the fallback rows and calibrate `severity_correlation`.
 
@@ -144,4 +158,6 @@ envenomed denominators where the dry count is printed) are written in each row's
 - Non-venomous species share pooled (not species-specific) local-pain and context data
   (context from the 311 non-venomous bites in the Wijayasekara 2026 cohort).
 - Species mix uniform; GPS and month uniform until the Phase 3 geo prior.
+- Presentation delay: the same Kerala distribution for every species (no per-species series yet);
+  'within 6 h' read as disjoint from 'within 1 h'.
 - Kidney-injury onset uses the fallback: sources give creatinine curves, not onset times.

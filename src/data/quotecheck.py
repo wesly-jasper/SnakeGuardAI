@@ -3,7 +3,7 @@
     python -m src.data.quotecheck                 # fetch open-access texts, write docs/quote_check.md
     python -m src.data.quotecheck --offline       # use data/raw/fulltext_cache/ only
 
-For every row of clinical_table.csv, context_table.csv and species.csv, the text between
+For every row of clinical_table.csv, context_table.csv, species.csv and presentation_delay.csv, the text between
 single quotes in `evidence` is extracted and searched for in the open-access text of the row's
 sources (the `source_key` keys plus any other bib key named in the evidence). Texts come from
 Europe PMC (full-text XML, else the abstract) or from plain PDF links via `pdftotext`, and are
@@ -35,7 +35,7 @@ from src.data.knowledge import split_keys
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CACHE = REPO_ROOT / "data" / "raw" / "fulltext_cache"
-TABLES: tuple[str, ...] = ("clinical_table.csv", "context_table.csv", "species.csv")
+TABLES: tuple[str, ...] = ("clinical_table.csv", "context_table.csv", "species.csv", "presentation_delay.csv")
 MIN_FRAGMENT_CHARS = 12
 TIMEOUT_SECONDS = 30
 USER_AGENT = "SnakeGuardAI-quotecheck/0.1 (academic research prototype; polite single requests)"
@@ -282,6 +282,13 @@ def check_row(table: str, item: str, source_key: str, evidence: str, store: Sour
     return RowResult(table, item, keys, fragments, missing, unavailable, status)
 
 
+def row_label(table: str, row: dict[str, str]) -> str:
+    if table == "presentation_delay.csv":
+        return f"{row['profile']} / {row['min_hours']}-{row['max_hours'] or 'open'} h"
+    what = "dry_bite_rate" if table == "species.csv" else row[list(row)[1]]
+    return f"{row['species']} / {what}"
+
+
 def knowledge_rows(knowledge_dir: Path) -> list[tuple[str, str, str, str]]:
     """(table, item, source_key, evidence) for every row with evidence text."""
     rows: list[tuple[str, str, str, str]] = []
@@ -292,8 +299,7 @@ def knowledge_rows(knowledge_dir: Path) -> list[tuple[str, str, str, str]]:
         table = pd.read_csv(path, dtype=str).fillna("")
         for r in table.to_dict("records"):
             if r.get("evidence", "").strip():
-                what = "dry_bite_rate" if name == "species.csv" else r[table.columns[1]]
-                rows.append((name, f"{r['species']} / {what}", r.get("source_key", ""), r["evidence"]))
+                rows.append((name, row_label(name, r), r.get("source_key", ""), r["evidence"]))
     return rows
 
 

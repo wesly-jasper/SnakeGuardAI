@@ -36,9 +36,21 @@ variants:
     description: krait dry-bite rate 8/33 (silva2016krait) instead of 4/88
     knowledge_overrides:
       - {table: species, match: {species: Bungarus caeruleus}, set: {dry_bite_rate: 0.242}}
+  - name: delay_cumulative_reading
+    description: Kerala delay bins with '68% within 6 h' read as cumulative
+    set: {presentation_delay: {profile: kerala_adult_cumulative, open_bin_max_hours: 48}}
+  - name: delay_srilanka_paediatric
+    description: faster Sri Lankan delay bins (rathnayaka2022epidemiological, n=40)
+    set: {presentation_delay: {profile: srilanka_paediatric_hnpv, open_bin_max_hours: 24}}
+  - name: delay_open_bin_72h
+    description: open '> 24 h' delay bin capped at 72 h instead of 48 h
+    set: {presentation_delay: {profile: kerala_adult, open_bin_max_hours: 72}}
+  - name: delay_uniform_placeholder
+    description: old uncited placeholder, uniform 0.5-24 h
+    set: {presentation_delay: null, presentation_hours: [0.5, 24.0]}
   - name: early_presentation
-    description: presentation 0.5-6 h instead of 0.5-24 h
-    set: {presentation_hours: [0.5, 6.0]}
+    description: uncited uniform 0.5-6 h (stress test)
+    set: {presentation_delay: null, presentation_hours: [0.5, 6.0]}
   - name: echis_rajasthan
     description: saw-scaled viper as E. c. sochureki, Rajasthan (gopalakrishnan2025antivenom)
     knowledge_overrides:
