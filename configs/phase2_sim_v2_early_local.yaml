@@ -1,0 +1,30 @@
+# Phase 2 SENSITIVITY run on sim_v2_early_local (assumed early window for 3 local signs, see that config).
+# All results are SIMULATION results.
+#   python -m src.data.generate --config configs/sim_v2_early_local.yaml   # if data/processed/sim_v2_early_local is missing
+#   python -m src.train --config configs/phase2_sim_v2_early_local.yaml
+name: phase2_sim_v2_early_local
+dataset: data/processed/sim_v2_early_local
+output_dir: outputs/phase2/sim_v2_early_local
+seeds: [0, 1, 2]
+validation_fraction: 0.15   # carved out of the train split for early stopping
+torch_threads: 4
+models:
+  prior: {}
+  rule: {}
+  xgboost:
+    params: {n_estimators: 600, max_depth: 4, learning_rate: 0.05, subsample: 0.9,
+             colsample_bytree: 0.9, early_stopping_rounds: 30}
+  xgboost_context:
+    params: {n_estimators: 600, max_depth: 4, learning_rate: 0.05, subsample: 0.9,
+             colsample_bytree: 0.9, early_stopping_rounds: 30}
+  transformer:
+    d_model: 64
+    n_heads: 4
+    n_layers: 2
+    dropout: 0.1
+    lr: 0.001
+    weight_decay: 0.01
+    batch_size: 256
+    max_epochs: 60
+    patience: 8
+    species_loss_weight: 1.0

@@ -16,7 +16,8 @@
   reference for Phase 5.
 - Training: `train` split minus 15% validation (early stopping), 3 seeds. The `calibration`
   split is never fitted on; its probabilities are saved for Phase 6. Metrics on `test` (n=4,000).
-- Run: `python -m src.train --config configs/phase2_sim_v2.yaml` (primary) and
+- Run: `python -m src.train --config configs/phase2_sim_v2.yaml` (primary); sensitivity runs
+  `configs/phase2_sim_v2_early_local.yaml` (assumed early local-sign window, finding 6) and
   `configs/phase2_sim_v1.yaml` (sensitivity: unknown onsets filled with the assumed 0-24 h window).
 
 ## Venom syndrome, test split (mean ± sd over 3 seeds)
@@ -53,13 +54,30 @@ have the same cited symptom profile, so they cannot be told apart from symptoms 
 5. **XGBoost ≈ transformer** on this data. The simulated timelines are short (median 0 observed
    events) and the features are low-dimensional, so the transformer has nothing extra to exploit
    yet. Its value is as the symptom encoder for Phase 5 fusion, not as a standalone win.
-6. **Data gap found: early local signs are label-only.** Russell's viper local pain (frequency 1.00),
-   cobra local swelling (1.00) and saw-scaled viper local pain (0.96) have no cited onset window,
-   so in sim_v2 they are never visible. Filling them with the broad assumed 0-24 h window (sim_v1)
-   only moves critical error 0.35 → 0.32 because many draws land after presentation. These signs
-   are usually reported within minutes to hours of the bite; a cited early onset window would
-   likely lower the symptom-only critical error considerably. This is a knowledge-table task
-   (needs a citation and quote), not a model change.
+6. **Data gap found: early local signs are label-only, and they dominate the result.** Russell's
+   viper local pain (frequency 1.00) and swelling (0.925), cobra local swelling (1.00) and
+   saw-scaled viper local pain (0.96) have no cited onset window, so in sim_v2 they are never
+   visible. Filling all unknown onsets with the broad assumed 0-24 h window (sim_v1) only moves
+   critical error 0.35 → 0.32, because many draws land after presentation. A second literature
+   search (knowledge/extraction/onsets_vipers.md section 4) found **no citable since-bite onset**
+   for these four rows. To measure what a cited early window would be worth, `sim_v2_early_local`
+   (`configs/sim_v2_early_local.yaml`, sensitivity only) gives just these four rows an
+   **assumed** [0, 1.5] h window. The window is taken by analogy with the cited early local-sign
+   windows of Echis swelling (bawaskar2019diagnosis) and Hypnale (abraham2025single):
+
+   | model (test, 3 seeds) | macro-F1 | critical error | species top-3 |
+   |---|---|---|---|
+   | rule | 0.643 | 0.124 | - |
+   | xgboost | 0.784 ± 0.002 | 0.124 | 0.871 ± 0.002 |
+   | transformer | 0.782 ± 0.003 | 0.122 ± 0.003 | 0.874 ± 0.001 |
+   | xgboost_context | 0.804 ± 0.002 | 0.082 ± 0.003 | 0.921 ± 0.001 |
+
+   The no-symptom share at presentation drops from 63% to 50%. Critical error falls from about
+   0.35 to about 0.12, and the remaining errors are again patients without any visible sign.
+   So the headline symptom-only number depends mainly on four uncited onset windows, not on
+   the model. Getting real time-to-local-sign data (clinician co-author, the Silva/Isbister cohort
+   authors, Phillips 1988 QJM, Warrell 2010 Lancet) is the highest-value data task before Phase 6.
+   Until then, report sim_v2 as primary and sim_v2_early_local as the sensitivity bound.
 
 ## Limitations
 

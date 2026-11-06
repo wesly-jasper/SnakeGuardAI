@@ -176,4 +176,9 @@ mohfw2017stg, dayasiri2025when, shahmy2017prospective, thalgaspitiya2020bites.
   (Elsevier 403); Bhalla et al. 2014 APJMT 3(2):55-58 (DNS failure; a search snippet says abdominal
   pain appeared "within a few minutes to hours in 88.2%" and features "within 1 to 4 hours", NOT
   verified, not recorded); seneviratne2002neurological full text (LWW 402).
+- **Second search (2026-11-06, Phase 2 follow-up):** N. naja local_swelling onset searched again;
+  still nothing citable. silva2026cobra (54 authenticated bites, 2017-2025) reports swelling 39/54
+  in a search snippet but the full text is not accessible; the only times found are for other
+  species (Naja atra Hong Kong "within 4 hours"; N. kaouthia). See onsets_vipers.md section 4 and
+  configs/sim_v2_early_local.yaml (assumed [0, 1.5] h window, sensitivity only).
 - **Species caveat:** the only cobra local-necrosis timing (faiz2017monocled) is for Naja kaouthia, not N. naja.

@@ -1,0 +1,37 @@
+# SENSITIVITY dataset: sim_v2 plus an ASSUMED early onset window for three local signs that have a
+# cited frequency but no cited onset (Russell's viper local pain and swelling, cobra local swelling,
+# saw-scaled viper local pain). The literature search of 2026-11-06 found no since-bite onset for
+# them (knowledge/extraction/onsets_vipers.md, onsets_elapids.md). The window [0, 1.5] h is an
+# ASSUMPTION by analogy with the cited early local-sign windows of the other vipers:
+# Echis local swelling <= 1.5 h (bawaskar2019diagnosis) and Hypnale local signs IQR 0.66-1.5 h
+# (abraham2025single). Purpose: measure how much a cited window would change Phase 2.
+# Output is SIMULATION data.
+name: sim_v2_early_local
+experiment_type: sensitivity
+seed: 42
+n_patients: 20000
+knowledge_dir: knowledge
+output_dir: data/processed/sim_v2_early_local
+# Bite-to-presentation delay: cited bins from knowledge/presentation_delay.csv.
+# kerala_adult = sajeethkumar2018clinical (n=1,500, North Kerala). The '> 24 h' bin has no
+# reported upper bound; open_bin_max_hours is an assumption (varied in sensitivity_v2).
+presentation_delay:
+  profile: kerala_adult
+  open_bin_max_hours: 48
+species_weights: null          # uniform until a cited epidemiological mix is chosen
+syndrome_precedence: [haemotoxic, neurotoxic]
+# Shared latent severity (Gaussian copula). Modelling assumption with no cited value yet:
+# 0 = independent symptoms. Varied 0-0.8 in configs/sensitivity_v2.yaml.
+severity_correlation: 0.5
+unknown_onset: label_only      # exclude | label_only (fallback only in sensitivity configs)
+onset_fallback: null           # unknown onsets are never filled in the primary dataset
+max_order_tries: 100           # redraws for onset orders the push alone cannot satisfy
+diagnostics_n_per_species: 2000
+splits: {train: 0.6, calibration: 0.2, test: 0.2}
+require_citations: false       # set true once knowledge/ is fully filled
+require_verified: false        # set true once every row is human-checked
+knowledge_overrides:            # ASSUMPTION (see header): early window for three label-only local signs
+  - {table: clinical, match: {species: Daboia russelii, symptom: local_pain}, set: {onset_min_hours: 0.0, onset_max_hours: 1.5}}
+  - {table: clinical, match: {species: Daboia russelii, symptom: local_swelling}, set: {onset_min_hours: 0.0, onset_max_hours: 1.5}}
+  - {table: clinical, match: {species: Naja naja, symptom: local_swelling}, set: {onset_min_hours: 0.0, onset_max_hours: 1.5}}
+  - {table: clinical, match: {species: Echis carinatus, symptom: local_pain}, set: {onset_min_hours: 0.0, onset_max_hours: 1.5}}

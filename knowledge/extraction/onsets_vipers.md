@@ -171,3 +171,29 @@ Existing keys reused: silva2016neurotoxicity, abraham2025single, who2016guidelin
   already in vipers.md.
 - Not accessible: Ariaratnam 2009 AJTMH syndromic survey (403), Warrell 2010 Lancet, Phillips 1988 QJM,
   Rathnayaka 2019 TRSTMH kidney paper, Silva 2016 Clin Toxicol full text.
+
+## 4. Second search for early local-sign onsets (2026-11-06, Phase 2 follow-up)
+
+Motivation: Phase 2 (docs/phase2_results.md) showed that Russell's viper local_pain (1.00) and
+local_swelling (0.925) and saw-scaled viper local_pain (0.958) are label-only in sim_v2 (no cited
+onset), so no model ever sees them. Searched again for a since-bite onset. **Nothing citable found.**
+
+- Cached full texts (data/raw/fulltext_cache/*.txt) re-grepped for timing phrases near pain/swelling
+  and for local signs "on admission": none with a since-bite time for these rows.
+- kularatne2014revisiting (PMC3936006): admission median 28 min (range 10-180) and Table 2 swelling
+  49/55, but Table 2 covers the whole admission, not findings on admission, so it is not an upper
+  bound. The score item "Onset within 30 minutes of bite" belongs to abdominal pain.
+- Isbister et al. 2015 PLoS NTD (10.1371/journal.pntd.0003968, 146 EIA-confirmed bites): "Local effects
+  were reported in 134 (91%) patients"; no per-sign counts, no admission findings, no onset times.
+- Silva/Isbister 2016 neurotoxicity cohort (245 bites, median presentation 2.5 h): abstract gives
+  "bite site pain and swelling in 244/245" with no onset; full text blocked (Clin Toxicol).
+- Saw-scaled viper TMA case report (PMC8283212): n=1, no bite-to-admission time.
+- Search snippets mention a 15-patient Echis series with pain 15/15 and swelling 14/15 "on admission";
+  source not identified, so not recorded.
+- Not used (wrong species or region): Merck/AAFP/NOLS statements on North American pit vipers
+  (swelling 30-60 min); Hong Kong Naja atra series (swelling "within 4 hours").
+
+A sensitivity dataset with an ASSUMED [0, 1.5] h window for these rows (by analogy with the cited
+Echis swelling and Hypnale local-sign windows) is configs/sim_v2_early_local.yaml.
+Best next step: ask a clinician co-author or the Silva/Isbister cohort authors for time-to-local-sign
+data, or read Phillips 1988 QJM / Warrell 2010 Lancet in a library.
