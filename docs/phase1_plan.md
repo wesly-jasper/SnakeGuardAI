@@ -73,7 +73,7 @@ Sources, preferring authenticated (snake identified) case series from South Asia
 - All rows are `verified=true` after human review against PDFs.
 - `generate` produces a reproducible dataset; tests pass.
 
-## Status (2026-11-05): engineering complete, human verification pending
+## Status (2026-11-06): engineering complete, human verification pending
 
 Done:
 - Schema, loader, simulator (course labels, censoring, dry bites, context), generation CLI,
@@ -85,8 +85,41 @@ Done:
   become [0, X] (or [0.5, X] for krait neurotoxic signs, after the first sign, ptosis, at 0.5 h).
   The remaining 27 rows use the configurable fallback window 0-24 h (`onset_fallback` in
   `configs/sim_v1.yaml`, cited to mohfw2017stg's 24 h observation rule). Set it to null to drop them.
+- Context table: krait, cobra, Russell's viper and pooled non-venomous rows are now derived from
+  the Wijayasekara 2026 raw data (S1 Appendix, 4,708 bites, CC BY 4.0) by
+  `python -m src.data.wijayasekara <Data.xlsx>`; exact n/N in each row's evidence. Hump-nosed
+  viper stays on ariaratnam2008frequent (species-confirmed; the raw data is genus-level).
+- Patient-level datasets found but not yet usable from scripts (Newcastle repository blocks
+  automated download; get them in a browser): Silva 2016 krait (per-patient neurological timings,
+  all rights reserved: ask the authors before use), Silva 2016 Russell's viper myotoxicity
+  (all rights reserved), Ratnayake 2019 Russell's viper AKI time course (CC BY 4.0).
 - sim_v1 (20k patients, SIMULATED): simulated rates match table frequencies within 0.03; the
   rule-based baseline on the test split gives accuracy 0.84, macro-F1 0.80, critical error 9.2%.
+
+Research-grade additions (2026-11-06):
+- Symptom dependence: shared latent severity (Gaussian copula, `severity_correlation`, default
+  0.5) links presence and earlier onset while keeping every cited marginal frequency and window.
+- Cited onset order (`knowledge/onset_order.csv`): ptosis -> ophthalmoplegia -> bulbar ->
+  respiratory / limb (mohfw2017stg, silva2016krait); krait abdominal pain before ptosis
+  (kularatne1998krait).
+- Automatic quote pre-check (`python -m src.data.quotecheck` -> `docs/quote_check.md`): of 80 rows,
+  39 quotes found in the open full text, 7 partial, 15 not found (mostly abstract-only access),
+  19 without a quote. Not a substitute for human verification.
+- Sensitivity analysis (`python -m src.data.sensitivity --config configs/sensitivity_v1.yaml`,
+  12 variants, SIMULATED, rule-based baseline): critical error rate 0.07-0.33, macro-F1 0.56-0.85.
+  Most influential: time to presentation (uniform 0.5-24 h placeholder; 0.145 -> 0.334 when all
+  present within 6 h), the onset fallback window (0.07-0.19) and severity correlation
+  (0.10-0.18). Dry-bite rates, syndrome precedence, cobra coagulopathy and Echis population
+  each move it by <= 0.03, so those open decisions are robust.
+- Clinician review kit (`python -m src.data.vignettes`, `docs/clinician_review_protocol.md`):
+  blinded vignettes, rating form, answer key; can mix in real cases for a real-vs-simulated test.
+- Tests: 80, passing on system Python (pandas 2.3) and the project .venv (pandas 3.1).
+
+Next evidence priorities (from the sensitivity analysis):
+1. A cited bite-to-presentation distribution (most series report it) to replace the uniform
+   0.5-24 h placeholder.
+2. Real onset times (Silva 2016 krait dataset with permission; Ratnayake 2019 AKI, CC BY) to
+   shrink the fallback rows and calibrate `severity_correlation`.
 
 Remaining gate (human only):
 - Check every row in `docs/verification_checklist.md` against the PDF and set `verified=true`,
@@ -108,6 +141,7 @@ envenomed denominators where the dry count is printed) are written in each row's
 - Russell's viper dry-bite rate 4% (hospital series), not ~50% (WHO guideline).
 - Cobra coagulopathy 3/20 kept as published, although its authors call it unverified; it makes
   about 12% of simulated cobra bites haemotoxic. Set the frequency to 0 to drop it.
-- Non-venomous species share pooled (not species-specific) local-pain and context data.
+- Non-venomous species share pooled (not species-specific) local-pain and context data
+  (context from the 311 non-venomous bites in the Wijayasekara 2026 cohort).
 - Species mix uniform; GPS and month uniform until the Phase 3 geo prior.
 - Kidney-injury onset uses the fallback: sources give creatinine curves, not onset times.

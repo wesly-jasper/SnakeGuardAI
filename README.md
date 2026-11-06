@@ -70,7 +70,17 @@ Knowledge rows are AI-assisted drafts until checked by a person. To list what st
 
 ```bash
 python -m src.data.checklist   # writes docs/verification_checklist.md
+python -m src.data.quotecheck  # checks quotes against open full texts -> docs/quote_check.md
 ```
+
+Robustness and realism checks (all output is simulation data):
+
+```bash
+python -m src.data.sensitivity --config configs/sensitivity_v1.yaml
+python -m src.data.vignettes --dataset data/processed/sim_v1 --n 40 --out data/processed/review_v1
+```
+
+See `docs/clinician_review_protocol.md` for the blinded review.
 
 ## Status
 

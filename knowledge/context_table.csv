@@ -1,21 +1,24 @@
 species,feature,probability,source_key,evidence,verified
-Bungarus caeruleus,night,0.743,wijayasekara2026patterns,"Results '75 (74.3%) occurred at night (7 pm to 6 am)' of 101. silva2016krait: 30/33",false
-Bungarus caeruleus,asleep,0.606,wijayasekara2026patterns,"Table 1 Activity 'Sleeping 60 (60.6%)' of 99. silva2016krait: 25/33",false
-Bungarus caeruleus,indoor,0.615,wijayasekara2026patterns,"Table 1 Location 'Indoors 59 (61.5%)' of 96",false
-Naja naja,night,0.145,wijayasekara2026patterns,"Results '53 (85.5%) occurred during the day (9 am to 7 pm)' of 62; night = 9/62 (day window differs from 06-18)",false
-Naja naja,asleep,0.033,wijayasekara2026patterns,"Table 1 Activity 'Sleeping 2 (3.3%)' of 60",false
-Naja naja,indoor,0.288,wijayasekara2026patterns,"Table 1 Location 'Indoors 17 (28.8%)' of 59",false
-Echis carinatus,night,0.688,gnanathasan2012sawscaled,"Table 1 'Time of bite ... Night 33 69'; 33/48 (Sri Lanka)",false
-Echis carinatus,indoor,0.0,gnanathasan2012sawscaled,"Results 'all were outdoor bites'; 0/48",false
-Hypnale hypnale,night,0.556,ariaratnam2008frequent,"Sec 3.3 '00:00-06:00 h, 17 (6%) ... 18:00-00:00 h, 151 (50%)'; night 18-06 = 168/302",false
-Hypnale hypnale,asleep,0.013,ariaratnam2008frequent,"Sec 3.4 'Only four (1%) were bitten while sleeping'; 4/302",false
-Hypnale hypnale,indoor,0.020,ariaratnam2008frequent,"Sec 3.4 'Only six bites (2%) occurred within the patient's house'; 6/302",false
-Ptyas mucosa,night,0.240,dayasiri2025when,"POOLED non-venomous, children, ID mostly by caregiver: '44 cases (24.0%) at night' of 183 (clock hours not defined)",false
-Ptyas mucosa,indoor,0.301,dayasiri2025when,"POOLED non-venomous, children: '55 bites (30.1%) occurred inside the home' of 183",false
-Ptyas mucosa,asleep,0.011,dayasiri2025when,"POOLED non-venomous, children: 'Resting or sleeping incidents were reported in two cases (1.1%)'",false
-Lycodon aulicus,night,0.240,dayasiri2025when,"POOLED non-venomous, children, ID mostly by caregiver: '44 cases (24.0%) at night' of 183 (clock hours not defined)",false
-Lycodon aulicus,indoor,0.301,dayasiri2025when,"POOLED non-venomous, children: '55 bites (30.1%) occurred inside the home' of 183",false
-Lycodon aulicus,asleep,0.011,dayasiri2025when,"POOLED non-venomous, children: 'Resting or sleeping incidents were reported in two cases (1.1%)'",false
-Fowlea piscator,night,0.240,dayasiri2025when,"POOLED non-venomous, children, ID mostly by caregiver: '44 cases (24.0%) at night' of 183 (clock hours not defined)",false
-Fowlea piscator,indoor,0.301,dayasiri2025when,"POOLED non-venomous, children: '55 bites (30.1%) occurred inside the home' of 183",false
-Fowlea piscator,asleep,0.011,dayasiri2025when,"POOLED non-venomous, children: 'Resting or sleeping incidents were reported in two cases (1.1%)'",false
+Bungarus caeruleus,asleep,0.616,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='IK': 61/99 (derived by src/data/wijayasekara.py; asleep definition in its docstring)",False
+Bungarus caeruleus,indoor,0.606,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='IK': 60/99 (derived by src/data/wijayasekara.py; indoor definition in its docstring)",False
+Bungarus caeruleus,night,0.762,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='IK': 77/101 (derived by src/data/wijayasekara.py; night definition in its docstring)",False
+Daboia russelii,asleep,0.014,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='RV': 10/724 (derived by src/data/wijayasekara.py; asleep definition in its docstring)",False
+Daboia russelii,indoor,0.071,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='RV': 52/728 (derived by src/data/wijayasekara.py; indoor definition in its docstring)",False
+Daboia russelii,night,0.423,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='RV': 312/737 (derived by src/data/wijayasekara.py; night definition in its docstring)",False
+Echis carinatus,indoor,0.0,gnanathasan2012sawscaled,Results 'all were outdoor bites'; 0/48,False
+Echis carinatus,night,0.688,gnanathasan2012sawscaled,Table 1 'Time of bite ... Night 33 69'; 33/48 (Sri Lanka),False
+Fowlea piscator,asleep,0.036,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='Non-V': POOLED non-venomous, not species-specific; 11/302 (derived by src/data/wijayasekara.py; asleep definition in its docstring)",False
+Fowlea piscator,indoor,0.524,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='Non-V': POOLED non-venomous, not species-specific; 161/307 (derived by src/data/wijayasekara.py; indoor definition in its docstring)",False
+Fowlea piscator,night,0.64,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='Non-V': POOLED non-venomous, not species-specific; 199/311 (derived by src/data/wijayasekara.py; night definition in its docstring)",False
+Hypnale hypnale,asleep,0.013,ariaratnam2008frequent,Sec 3.4 'Only four (1%) were bitten while sleeping'; 4/302,False
+Hypnale hypnale,indoor,0.02,ariaratnam2008frequent,Sec 3.4 'Only six bites (2%) occurred within the patient's house'; 6/302,False
+Hypnale hypnale,night,0.556,ariaratnam2008frequent,"Sec 3.3 '00:00-06:00 h, 17 (6%) ... 18:00-00:00 h, 151 (50%)'; night 18-06 = 168/302",False
+Lycodon aulicus,asleep,0.036,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='Non-V': POOLED non-venomous, not species-specific; 11/302 (derived by src/data/wijayasekara.py; asleep definition in its docstring)",False
+Lycodon aulicus,indoor,0.524,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='Non-V': POOLED non-venomous, not species-specific; 161/307 (derived by src/data/wijayasekara.py; indoor definition in its docstring)",False
+Lycodon aulicus,night,0.64,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='Non-V': POOLED non-venomous, not species-specific; 199/311 (derived by src/data/wijayasekara.py; night definition in its docstring)",False
+Naja naja,asleep,0.033,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='CBR': 2/60 (derived by src/data/wijayasekara.py; asleep definition in its docstring)",False
+Naja naja,indoor,0.274,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='CBR': 17/62 (derived by src/data/wijayasekara.py; indoor definition in its docstring)",False
+Naja naja,night,0.21,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='CBR': 13/62 (derived by src/data/wijayasekara.py; night definition in its docstring)",False
+Ptyas mucosa,asleep,0.036,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='Non-V': POOLED non-venomous, not species-specific; 11/302 (derived by src/data/wijayasekara.py; asleep definition in its docstring)",False
+Ptyas mucosa,indoor,0.524,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='Non-V': POOLED non-venomous, not species-specific; 161/307 (derived by src/data/wijayasekara.py; indoor definition in its docstring)",False
+Ptyas mucosa,night,0.64,wijayasekara2026patterns,"S1 Appendix Data.xlsx, Snake='Non-V': POOLED non-venomous, not species-specific; 199/311 (derived by src/data/wijayasekara.py; night definition in its docstring)",False

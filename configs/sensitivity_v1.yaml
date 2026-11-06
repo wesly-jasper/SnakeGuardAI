@@ -1,0 +1,49 @@
+# Sensitivity analysis over the disputed Phase 1 assumptions (docs/phase1_plan.md).
+# Output is SIMULATION data.
+base_config: configs/sim_v1.yaml
+output_dir: data/processed/sensitivity_v1
+n_patients: 10000
+variants:
+  - name: base
+    description: sim_v1 defaults
+  - name: independent
+    description: severity_correlation 0 (independent symptoms)
+    set: {severity_correlation: 0.0}
+  - name: strong_severity
+    description: severity_correlation 0.8
+    set: {severity_correlation: 0.8}
+  - name: fallback_12h
+    description: onset fallback window 0-12 h
+    set: {onset_fallback: {hours: [0, 12], source_key: mohfw2017stg}}
+  - name: fallback_48h
+    description: onset fallback window 0-48 h
+    set: {onset_fallback: {hours: [0, 48], source_key: mohfw2017stg}}
+  - name: no_fallback
+    description: drop rows without a cited onset window
+    set: {onset_fallback: null}
+  - name: neuro_first
+    description: neurotoxic wins over haemotoxic in mixed courses
+    set: {syndrome_precedence: [neurotoxic, haemotoxic]}
+  - name: rv_dry_who
+    description: Russell's viper dry-bite rate 0.5 (WHO) instead of 0.036
+    knowledge_overrides:
+      - {table: species, match: {species: Daboia russelii}, set: {dry_bite_rate: 0.5}}
+  - name: cobra_no_coag
+    description: cobra coagulopathy frequency 0 (authors call it unverified)
+    knowledge_overrides:
+      - {table: clinical, match: {species: Naja naja, symptom: incoagulable_blood}, set: {frequency: 0.0}}
+  - name: krait_dry_silva
+    description: krait dry-bite rate 8/33 (silva2016krait) instead of 4/88
+    knowledge_overrides:
+      - {table: species, match: {species: Bungarus caeruleus}, set: {dry_bite_rate: 0.242}}
+  - name: early_presentation
+    description: presentation 0.5-6 h instead of 0.5-24 h
+    set: {presentation_hours: [0.5, 6.0]}
+  - name: echis_rajasthan
+    description: saw-scaled viper as E. c. sochureki, Rajasthan (gopalakrishnan2025antivenom)
+    knowledge_overrides:
+      - {table: clinical, match: {species: Echis carinatus, symptom: incoagulable_blood}, set: {frequency: 0.981}}
+      - {table: clinical, match: {species: Echis carinatus, symptom: systemic_bleeding}, set: {frequency: 0.524}}
+      - {table: clinical, match: {species: Echis carinatus, symptom: local_swelling}, set: {frequency: 0.943}}
+      # AKI (19/105) cannot be overridden: the base row has no frequency (sources conflict),
+      # so the loader drops it. Add a frequency to the CSV to include it.

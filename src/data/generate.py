@@ -22,8 +22,8 @@ from typing import Any
 
 import yaml
 
-from src.data.knowledge import load_knowledge, read_bib_keys, split_keys
-from src.data.report import build_report
+from src.data.knowledge import apply_overrides, load_knowledge, read_bib_keys, split_keys
+from src.data.report import baseline_metrics, build_report, rule_predictions
 from src.data.simulator import (
     DEFAULT_PRECEDENCE,
     assign_splits,
@@ -95,6 +95,7 @@ def generate(config: dict[str, Any]) -> Path:
         require_verified=config.get("require_verified", False),
         allow_missing_onset=fallback is not None,
     )
+    kb = apply_overrides(kb, config.get("knowledge_overrides"))
     precedence = tuple(config.get("syndrome_precedence", DEFAULT_PRECEDENCE))
     patients = simulate_patients(
         kb,
@@ -104,6 +105,7 @@ def generate(config: dict[str, Any]) -> Path:
         presentation_hours_range=tuple(config.get("presentation_hours", (0.5, 24.0))),
         precedence=precedence,
         onset_fallback=fallback,
+        severity_correlation=float(config.get("severity_correlation", 0.0)),
     )
     table = to_dataframe(patients)
     table["split"] = assign_splits(len(patients), config.get("splits", DEFAULT_SPLITS), int(config["seed"]))
@@ -113,6 +115,11 @@ def generate(config: dict[str, Any]) -> Path:
     table.to_csv(out / "patients.csv", index=False)
     events_dataframe(patients).to_csv(out / "events.csv", index=False)
     n_fallback = count_fallback_rows(kb) if fallback else 0
+    test = [p for p, s in zip(patients, table["split"]) if s == "test"] if patients else []
+    baseline = (
+        baseline_metrics([p.venom_syndrome for p in test], rule_predictions(test, kb.marker_of(), precedence))
+        if test else {}
+    )
     meta = {
         "SIMULATED": True,
         "note": "Synthetic patients from a literature-derived table. Results are simulation results.",
@@ -123,6 +130,7 @@ def generate(config: dict[str, Any]) -> Path:
         "n_clinical_rows_using_onset_fallback": n_fallback,
         "n_rows_unverified": int((~kb.clinical["verified"]).sum() + (~kb.context["verified"]).sum()),
         "syndrome_counts": table["venom_syndrome"].value_counts().to_dict() if len(table) else {},
+        "rule_baseline_test": baseline,
     }
     (out / "meta.json").write_text(json.dumps(meta, indent=2, default=str), encoding="utf-8")
     if patients:

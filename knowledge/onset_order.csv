@@ -1,0 +1,6 @@
+species,before,after,source_key,evidence,verified
+*,ptosis,ophthalmoplegia,mohfw2017stg; silva2016krait,"mohfw2017stg 'Neuroparalytic' PDF p.18 'Ptosis (drooping of eyelids) occurs first (Figure 3), followed by Diplopia (double vision)'; silva2016krait Abstract 'rapidly descending paralysis, from ptosis to complete ophthalmoplegia'",false
+*,ophthalmoplegia,bulbar_palsy,mohfw2017stg; silva2016krait,"mohfw2017stg PDF p.18 'followed by Diplopia (double vision), then Dysarthria (speech difficulty)'; silva2016krait Abstract 'from ptosis to complete ophthalmoplegia, facial, bulbar and neck weakness'",false
+*,bulbar_palsy,respiratory_paralysis,mohfw2017stg,"PDF p.18 'Finally, paralysis of intercostal and skeletal muscles occurs in descending manner.'",false
+*,bulbar_palsy,limb_weakness,mohfw2017stg,"PDF p.18 'Finally, paralysis of intercostal and skeletal muscles occurs in descending manner.'",false
+Bungarus caeruleus,abdominal_pain,ptosis,kularatne1998krait,"p.55 'Abdominal pain is the first symptom that manifests after krait bite, within minutes to few hours'",false

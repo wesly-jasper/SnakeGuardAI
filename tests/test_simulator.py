@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from src.data.knowledge import KnowledgeBase, load_knowledge
@@ -160,3 +161,55 @@ def test_dataframes(kb: KnowledgeBase) -> None:
     events = events_dataframe(patients)
     assert len(events) == sum(len(p.course) for p in patients)
     assert events["observed"].sum() == sum(len(p.observed_events) for p in patients)
+
+
+def _three_symptom_kb(tmp_path: Path, order: list[tuple] | None = None) -> KnowledgeBase:
+    clinical = [
+        ("Species a", "neuro", 0.0, 10.0, 0.5, "fake2026", "", True),
+        ("Species a", "haemo", 0.0, 10.0, 0.5, "fake2026", "", True),
+        ("Species a", "vomit", 0.0, 10.0, 0.3, "fake2026", "", True),
+    ]
+    root = write_knowledge(tmp_path, clinical=clinical)
+    if order is not None:
+        pd.DataFrame(order, columns=["species", "before", "after", "source_key", "evidence", "verified"]).to_csv(
+            root / "onset_order.csv", index=False
+        )
+    return load_knowledge(root, require_citations=True)
+
+
+@pytest.mark.parametrize("rho", [0.0, 0.8])
+def test_severity_copula_keeps_marginals(tmp_path: Path, rho: float) -> None:
+    kb = _three_symptom_kb(tmp_path)
+    patients = simulate_patients(kb, 6000, seed=0, species_weights={"Species a": 1.0}, severity_correlation=rho)
+    present = pd.DataFrame([{s: s in {e.symptom for e in p.course} for s in ("neuro", "haemo", "vomit")} for p in patients])
+    assert present["neuro"].mean() == pytest.approx(0.5, abs=0.03)
+    assert present["vomit"].mean() == pytest.approx(0.3, abs=0.03)
+    corr = present["neuro"].astype(float).corr(present["haemo"].astype(float))
+    assert abs(corr) < 0.05 if rho == 0 else corr > 0.3
+    onsets = [e.hours for p in patients for e in p.course]
+    assert 0.0 <= min(onsets) and max(onsets) <= 10.0
+    if rho == 0:
+        assert np.mean(onsets) == pytest.approx(5.0, abs=0.3)  # uniform in the window
+    else:  # severe patients (more symptoms) have earlier onsets
+        n_sym = [len(p.course) for p in patients if p.course]
+        mean_onset = [np.mean([e.hours for e in p.course]) for p in patients if p.course]
+        assert np.corrcoef(n_sym, mean_onset)[0, 1] < -0.1
+
+
+def test_severity_correlation_validated(kb: KnowledgeBase) -> None:
+    with pytest.raises(ValueError):
+        simulate_patients(kb, 5, seed=0, severity_correlation=1.5)
+
+
+def test_onset_order(tmp_path: Path) -> None:
+    order = [("*", "neuro", "haemo", "fake2026", "", True)]
+    kb = _three_symptom_kb(tmp_path, order)
+    patients = simulate_patients(kb, 2000, seed=0, species_weights={"Species a": 1.0})
+    both = [{e.symptom: e.hours for e in p.course} for p in patients]
+    both = [h for h in both if "neuro" in h and "haemo" in h]
+    assert both and all(h["haemo"] >= h["neuro"] for h in both)
+
+
+def test_onset_order_rejects_unknown_symptom(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="onset_order"):
+        _three_symptom_kb(tmp_path, [("*", "neuro", "made_up", "fake2026", "", True)])

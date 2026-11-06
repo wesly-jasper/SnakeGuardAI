@@ -12,6 +12,16 @@ Placeholders until later phases:
   P(species | location, month) prior comes from GBIF occurrences in Phase 3.
 - Time to presentation is uniform over `presentation_hours_range`.
 - Context features (night, indoor, asleep) are sampled independently per species.
+
+Dependence between symptoms (modelling assumption, varied in the sensitivity analysis):
+a latent severity z ~ N(0, 1) per patient enters a Gaussian copula with correlation
+`severity_correlation` (rho). Higher severity makes every symptom more likely and its onset
+earlier within its window, while each symptom's marginal frequency and onset window stay
+exactly as cited (onset is uniform in the window over all draws; among patients who have
+a symptom it is skewed earlier when rho > 0, because they are more often severe).
+rho = 0 gives independent symptoms. Cited onset orders
+(knowledge/onset_order.csv) then push a later sign to no earlier than the sign before it,
+capped at its own window maximum.
 """
 
 from __future__ import annotations
@@ -22,8 +32,9 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+from scipy.special import ndtr, ndtri
 
-from src.data.knowledge import KnowledgeBase
+from src.data.knowledge import ALL_SPECIES, KnowledgeBase
 
 SYNDROMES: tuple[str, ...] = ("neurotoxic", "haemotoxic", "local-only", "non-venomous/dry")
 DRY_LABEL = "non-venomous/dry"
@@ -76,6 +87,7 @@ class SpeciesSpec:
     onset_max: np.ndarray
     frequency: np.ndarray
     context: dict[str, float]
+    order: tuple[tuple[int, int], ...] = ()
 
 
 def fill_onsets(
@@ -98,6 +110,35 @@ def count_fallback_rows(kb: KnowledgeBase) -> int:
     return int(active[["onset_min_hours", "onset_max_hours"]].isna().any(axis=1).sum())
 
 
+def order_pairs(
+    onset_order: pd.DataFrame, species: str, symptoms: tuple[str, ...]
+) -> tuple[tuple[int, int], ...]:
+    """(before, after) index pairs into `symptoms` that apply to `species`."""
+    index = {s: i for i, s in enumerate(symptoms)}
+    rules = onset_order[onset_order["species"].isin([species, ALL_SPECIES])]
+    return tuple(
+        (index[r.before], index[r.after])
+        for r in rules.itertuples()
+        if r.before in index and r.after in index
+    )
+
+
+def apply_order(
+    onsets: np.ndarray, present: np.ndarray, onset_max: np.ndarray, order: tuple[tuple[int, int], ...]
+) -> np.ndarray:
+    """Delay each `after` sign to no earlier than its `before` sign, capped at its window max."""
+    onsets = onsets.copy()
+    for _ in range(len(order)):  # enough passes to propagate along any chain
+        changed = False
+        for before, after in order:
+            if present[before] and present[after] and onsets[after] < onsets[before]:
+                onsets[after] = min(onsets[before], onset_max[after])
+                changed = True
+        if not changed:
+            break
+    return onsets
+
+
 def build_specs(
     kb: KnowledgeBase, onset_fallback: tuple[float, float] | None = None
 ) -> dict[str, SpeciesSpec]:
@@ -117,15 +158,17 @@ def build_specs(
             skipped.append(row.species)
             continue
         ctx = kb.context[kb.context["species"] == row.species]
+        symptoms = tuple(rows["symptom"])
         specs[row.species] = SpeciesSpec(
             species=row.species,
             venomous=venomous,
             dry_bite_rate=float(row.dry_bite_rate) if venomous and pd.notna(row.dry_bite_rate) else 0.0,
-            symptoms=tuple(rows["symptom"]),
+            symptoms=symptoms,
             onset_min=rows["onset_min_hours"].to_numpy(dtype=float),
             onset_max=rows["onset_max_hours"].to_numpy(dtype=float),
             frequency=rows["frequency"].to_numpy(dtype=float),
             context=dict(zip(ctx["feature"], ctx["probability"].astype(float))),
+            order=order_pairs(kb.onset_order, row.species, symptoms),
         )
     if skipped:
         warnings.warn(f"skipping venomous species with no clinical rows: {skipped}", stacklevel=2)
@@ -154,11 +197,26 @@ def derive_syndrome(
     return LOCAL_LABEL
 
 
-def sample_course(spec: SpeciesSpec, rng: np.random.Generator) -> tuple[bool, tuple[SymptomEvent, ...]]:
-    """Return (dry_bite, full symptom course sorted by onset)."""
+def sample_course(
+    spec: SpeciesSpec, rng: np.random.Generator, severity_correlation: float = 0.0
+) -> tuple[bool, tuple[SymptomEvent, ...]]:
+    """Return (dry_bite, full symptom course sorted by onset).
+
+    Presence and onset position use a Gaussian copula on a shared severity (see module
+    docstring); marginals equal the table's frequency and a uniform draw in the window.
+    """
+    if not 0.0 <= severity_correlation <= 1.0:
+        raise ValueError("severity_correlation must be within [0, 1]")
+    k = len(spec.symptoms)
     dry = spec.venomous and bool(rng.random() < spec.dry_bite_rate)
-    present = rng.random(len(spec.symptoms)) < spec.frequency
-    onsets = rng.uniform(spec.onset_min, spec.onset_max)
+    severity = rng.standard_normal()
+    shared, own = np.sqrt(severity_correlation), np.sqrt(1.0 - severity_correlation)
+    presence_latent = shared * severity + own * rng.standard_normal(k)
+    with np.errstate(divide="ignore"):
+        present = presence_latent > ndtri(1.0 - spec.frequency)
+    position = ndtr(-(shared * severity + own * rng.standard_normal(k)))  # severe -> early
+    onsets = spec.onset_min + position * (spec.onset_max - spec.onset_min)
+    onsets = apply_order(onsets, present, spec.onset_max, spec.order)
     if dry:
         return True, ()
     events = sorted(
@@ -194,9 +252,10 @@ def simulate_patient(
     marker_of: dict[str, str],
     presentation_hours_range: tuple[float, float] = (0.5, 24.0),
     precedence: Sequence[str] = DEFAULT_PRECEDENCE,
+    severity_correlation: float = 0.0,
 ) -> SyntheticPatient:
     """Sample one patient bitten by `spec.species`."""
-    dry, course = sample_course(spec, rng)
+    dry, course = sample_course(spec, rng, severity_correlation)
     hour, indoor, asleep = sample_context(spec.context, rng)
     return SyntheticPatient(
         species=spec.species,
@@ -236,6 +295,7 @@ def simulate_patients(
     presentation_hours_range: tuple[float, float] = (0.5, 24.0),
     precedence: Sequence[str] = DEFAULT_PRECEDENCE,
     onset_fallback: tuple[float, float] | None = None,
+    severity_correlation: float = 0.0,
 ) -> list[SyntheticPatient]:
     """Sample `n` synthetic patients. Species are uniform unless weights are given."""
     specs = build_specs(kb, onset_fallback)
@@ -247,7 +307,9 @@ def simulate_patients(
     picks = rng.choice(len(species), size=n, p=species_probabilities(species, species_weights))
     marker_of = kb.marker_of()
     return [
-        simulate_patient(specs[species[i]], rng, marker_of, presentation_hours_range, precedence)
+        simulate_patient(
+            specs[species[i]], rng, marker_of, presentation_hours_range, precedence, severity_correlation
+        )
         for i in picks
     ]
 

@@ -7,6 +7,9 @@ output_dir: data/processed/sim_v1
 presentation_hours: [0.5, 24.0]
 species_weights: null          # uniform until a cited epidemiological mix is chosen
 syndrome_precedence: [haemotoxic, neurotoxic]
+# Shared latent severity (Gaussian copula). Modelling assumption with no cited value yet:
+# 0 = independent symptoms. Varied 0-0.8 in configs/sensitivity_v1.yaml.
+severity_correlation: 0.5
 # Fills blank onset bounds for rows with a cited frequency but no cited onset window.
 # Basis: mohfw2017stg p.55 'If no symptoms and signs develop after 24 hours the patient can
 # be discharged' (all signs assumed to appear within 0-24 h). Set to null to drop such rows.

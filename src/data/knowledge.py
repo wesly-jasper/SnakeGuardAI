@@ -5,6 +5,7 @@ Files (see docs/phase1_plan.md):
 - species.csv         one row per species: group and dry-bite rate
 - clinical_table.csv  one row per (species, symptom): onset window and frequency
 - context_table.csv   one row per (species, feature): probability the feature is true
+- onset_order.csv     optional; (species or *, before, after): cited order of onset
 
 Every number must be cited. Rows with blank numbers (placeholders) are skipped with a
 warning unless `require_citations=True`, which refuses blank or uncited rows.
@@ -14,7 +15,7 @@ from __future__ import annotations
 
 import re
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
@@ -35,6 +36,8 @@ CLINICAL_COLUMNS: list[str] = [
 CONTEXT_COLUMNS: list[str] = [
     "species", "feature", "probability", "source_key", "evidence", "verified",
 ]
+ORDER_COLUMNS: list[str] = ["species", "before", "after", "source_key", "evidence", "verified"]
+ALL_SPECIES = "*"
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,7 @@ class KnowledgeBase:
     species: pd.DataFrame
     clinical: pd.DataFrame
     context: pd.DataFrame
+    onset_order: pd.DataFrame = field(default_factory=lambda: pd.DataFrame(columns=ORDER_COLUMNS))
 
     def marker_of(self) -> dict[str, str]:
         return dict(zip(self.symptoms["symptom"], self.symptoms["marker"]))
@@ -155,6 +159,18 @@ def validate_context(context: pd.DataFrame, kb_species: set[str]) -> None:
         raise ValueError("context_table.csv has duplicate (species, feature) rows")
 
 
+def validate_order(order: pd.DataFrame, kb_species: set[str], vocab: set[str]) -> None:
+    _check_members(order["species"], kb_species | {ALL_SPECIES}, "species in onset_order.csv")
+    _check_members(pd.concat([order["before"], order["after"]]), vocab, "symptom in onset_order.csv")
+    if (order["before"] == order["after"]).any():
+        raise ValueError("onset_order.csv: a symptom cannot precede itself")
+
+
+def read_order(root: Path) -> pd.DataFrame:
+    path = root / "onset_order.csv"
+    return read_table(path, ORDER_COLUMNS) if path.exists() else pd.DataFrame(columns=ORDER_COLUMNS)
+
+
 def load_knowledge(
     knowledge_dir: str | Path,
     require_citations: bool = False,
@@ -171,6 +187,7 @@ def load_knowledge(
     species = read_table(root / "species.csv", SPECIES_COLUMNS)
     clinical = read_table(root / "clinical_table.csv", CLINICAL_COLUMNS)
     context = read_table(root / "context_table.csv", CONTEXT_COLUMNS)
+    order = read_order(root)
 
     venomous = species["group"] == "venomous"
     dry_needed = species[venomous]
@@ -183,6 +200,7 @@ def load_knowledge(
         check_citations(dry_needed, bib_keys, "species.csv")
         check_citations(clinical, bib_keys, "clinical_table.csv")
         check_citations(context, bib_keys, "context_table.csv")
+        check_citations(order, bib_keys, "onset_order.csv")
     elif dry_needed["dry_bite_rate"].isna().any():
         warnings.warn(
             "dry_bite_rate blank for "
@@ -194,14 +212,53 @@ def load_knowledge(
         _check_verified(clinical, "clinical_table.csv")
         _check_verified(context, "context_table.csv")
         _check_verified(dry_needed, "species.csv")
+        _check_verified(order, "onset_order.csv")
 
     validate_symptoms(symptoms)
     validate_species(species)
     validate_clinical(clinical, set(species["species"]), set(symptoms["symptom"]))
     validate_context(context, set(species["species"]))
-    return KnowledgeBase(symptoms, species, clinical, context)
+    validate_order(order, set(species["species"]), set(symptoms["symptom"]))
+    return KnowledgeBase(symptoms, species, clinical, context, order)
 
 
 def _check_verified(table: pd.DataFrame, name: str) -> None:
     if not table["verified"].all():
         raise ValueError(f"{name}: {int((~table['verified']).sum())} row(s) not human-verified")
+
+
+OVERRIDE_TABLES: dict[str, list[str]] = {
+    "species": ["species"],
+    "clinical": ["species", "symptom"],
+    "context": ["species", "feature"],
+}
+
+
+def apply_overrides(kb: KnowledgeBase, overrides: list[dict] | None) -> KnowledgeBase:
+    """Return a copy of `kb` with single values replaced, for sensitivity analyses.
+
+    Each override is {"table": species|clinical|context, "match": {key columns},
+    "set": {column: value}} and must match exactly one row. The CSVs are not touched.
+    """
+    if not overrides:
+        return kb
+    tables = {name: getattr(kb, name).copy() for name in OVERRIDE_TABLES}
+    for spec in overrides:
+        name = spec["table"]
+        if name not in OVERRIDE_TABLES:
+            raise ValueError(f"override table must be one of {sorted(OVERRIDE_TABLES)}")
+        table = tables[name]
+        if set(spec["match"]) != set(OVERRIDE_TABLES[name]):
+            raise ValueError(f"override on {name} must match on {OVERRIDE_TABLES[name]}")
+        mask = pd.Series(True, index=table.index)
+        for col, value in spec["match"].items():
+            mask &= table[col] == value
+        if mask.sum() != 1:
+            raise ValueError(f"override {spec['match']} matched {int(mask.sum())} rows in {name}")
+        for col, value in spec["set"].items():
+            if col not in table.columns:
+                raise ValueError(f"unknown column {col} in {name}")
+            table.loc[mask, col] = value
+    return KnowledgeBase(
+        kb.symptoms, tables["species"], tables["clinical"], tables["context"], kb.onset_order
+    )
