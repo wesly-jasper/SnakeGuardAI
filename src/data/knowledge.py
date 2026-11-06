@@ -6,6 +6,8 @@ Files (see docs/phase1_plan.md):
 - clinical_table.csv  one row per (species, symptom): onset window and frequency
 - context_table.csv   one row per (species, feature): probability the feature is true
 - onset_order.csv     optional; (species or *, before, after): cited order of onset
+- context_joint.csv   optional; (species, night, indoor, asleep): cited joint counts
+- presentation_delay.csv  bite-to-presentation delay bins (loaded by src/data/presentation.py)
 
 Every number must be cited. Rows with blank numbers (placeholders) are skipped with a
 warning unless `require_citations=True`, which refuses blank or uncited rows.
@@ -18,6 +20,7 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 MARKERS: frozenset[str] = frozenset({"neurotoxic", "haemotoxic", "local", "none"})
@@ -37,6 +40,15 @@ CONTEXT_COLUMNS: list[str] = [
     "species", "feature", "probability", "source_key", "evidence", "verified",
 ]
 ORDER_COLUMNS: list[str] = ["species", "before", "after", "source_key", "evidence", "verified"]
+JOINT_COLUMNS: list[str] = [
+    "species", "night", "indoor", "asleep", "count", "source_key", "evidence", "verified",
+]
+JOINT_FEATURES: tuple[str, ...] = ("night", "indoor", "asleep")
+# Every table with numbers and a `verified` column; used by verification_summary().
+EVIDENCE_TABLES: tuple[str, ...] = (
+    "species.csv", "clinical_table.csv", "context_table.csv", "context_joint.csv",
+    "onset_order.csv", "presentation_delay.csv",
+)
 ALL_SPECIES = "*"
 
 
@@ -47,6 +59,7 @@ class KnowledgeBase:
     clinical: pd.DataFrame
     context: pd.DataFrame
     onset_order: pd.DataFrame = field(default_factory=lambda: pd.DataFrame(columns=ORDER_COLUMNS))
+    context_joint: pd.DataFrame = field(default_factory=lambda: pd.DataFrame(columns=JOINT_COLUMNS))
 
     def marker_of(self) -> dict[str, str]:
         return dict(zip(self.symptoms["symptom"], self.symptoms["marker"]))
@@ -115,9 +128,16 @@ def drop_incomplete(
 
 
 def _check_probability(table: pd.DataFrame, col: str, name: str) -> None:
-    values = table[col].dropna()
-    if ((values < 0) | (values > 1)).any():
-        raise ValueError(f"{name}: {col} must be within [0, 1]")
+    values = pd.to_numeric(table[col], errors="raise").dropna()
+    if not values.between(0, 1).all():
+        raise ValueError(f"{name}: {col} must be a finite number within [0, 1]")
+
+
+def _check_finite(table: pd.DataFrame, cols: list[str], name: str) -> None:
+    for col in cols:
+        values = pd.to_numeric(table[col], errors="raise").dropna()
+        if not np.isfinite(values.to_numpy(dtype=float)).all():
+            raise ValueError(f"{name}: {col} must be finite")
 
 
 def _check_members(values: pd.Series, allowed: set[str] | frozenset[str], what: str) -> None:
@@ -143,6 +163,7 @@ def validate_clinical(clinical: pd.DataFrame, kb_species: set[str], vocab: set[s
     _check_members(clinical["species"], kb_species, "species in clinical_table.csv")
     _check_members(clinical["symptom"], vocab, "symptom in clinical_table.csv")
     _check_probability(clinical, "frequency", "clinical_table.csv")
+    _check_finite(clinical, ["onset_min_hours", "onset_max_hours"], "clinical_table.csv")
     if (clinical["onset_min_hours"] < 0).any():
         raise ValueError("onset_min_hours must be >= 0")
     if (clinical["onset_min_hours"] > clinical["onset_max_hours"]).any():
@@ -164,6 +185,83 @@ def validate_order(order: pd.DataFrame, kb_species: set[str], vocab: set[str]) -
     _check_members(pd.concat([order["before"], order["after"]]), vocab, "symptom in onset_order.csv")
     if (order["before"] == order["after"]).any():
         raise ValueError("onset_order.csv: a symptom cannot precede itself")
+    for species in sorted(kb_species | {ALL_SPECIES}):
+        cycle = find_cycle(order_edges(order, species))
+        if cycle:
+            raise ValueError(f"onset_order.csv: cycle for {species}: {' -> '.join(cycle)}")
+
+
+def order_edges(order: pd.DataFrame, species: str) -> list[tuple[str, str]]:
+    """(before, after) rules that apply to `species` (its own plus the `*` rules)."""
+    rules = order[order["species"].isin([species, ALL_SPECIES])]
+    return list(dict.fromkeys(zip(rules["before"], rules["after"])))
+
+
+def find_cycle(edges: list[tuple[str, str]]) -> list[str]:
+    """A cycle in the directed graph `edges` as [a, b, ..., a], or [] if it is acyclic."""
+    graph: dict[str, list[str]] = {}
+    for before, after in edges:
+        graph.setdefault(before, []).append(after)
+    state: dict[str, int] = {}  # 1 = on the current path, 2 = finished
+    path: list[str] = []
+
+    def visit(node: str) -> list[str]:
+        state[node] = 1
+        path.append(node)
+        for nxt in graph.get(node, []):
+            if state.get(nxt) == 1:
+                return path[path.index(nxt):] + [nxt]
+            if nxt not in state:
+                found = visit(nxt)
+                if found:
+                    return found
+        state[node] = 2
+        path.pop()
+        return []
+
+    for node in list(graph):
+        if node not in state:
+            found = visit(node)
+            if found:
+                return found
+    return []
+
+
+def validate_joint(joint: pd.DataFrame, kb_species: set[str]) -> None:
+    _check_members(joint["species"], kb_species, "species in context_joint.csv")
+    counts = pd.to_numeric(joint["count"], errors="raise")
+    if counts.isna().any() or (counts < 0).any() or (counts % 1 != 0).any():
+        raise ValueError("context_joint.csv: count must be a non-negative integer")
+    if joint.duplicated(["species", *JOINT_FEATURES]).any():
+        raise ValueError("context_joint.csv has duplicate (species, night, indoor, asleep) cells")
+    for species, group in joint.groupby("species"):
+        if group["count"].sum() <= 0:
+            raise ValueError(f"context_joint.csv: {species} has no observations")
+
+
+def read_joint(root: Path) -> pd.DataFrame:
+    path = root / "context_joint.csv"
+    if not path.exists():
+        return pd.DataFrame(columns=JOINT_COLUMNS)
+    joint = read_table(path, JOINT_COLUMNS)
+    for col in JOINT_FEATURES:
+        if not joint[col].astype(str).str.lower().isin({"true", "false"}).all():
+            raise ValueError(f"context_joint.csv: {col} must be true/false")
+        joint[col] = joint[col].astype(str).str.lower() == "true"
+    return joint
+
+
+def verification_summary(knowledge_dir: str | Path) -> dict[str, dict[str, int]]:
+    """Rows and unverified rows per evidence table (all rows in the file, used or not)."""
+    root = Path(knowledge_dir)
+    summary = {}
+    for name in EVIDENCE_TABLES:
+        path = root / name
+        if not path.exists():
+            continue
+        verified = pd.read_csv(path, usecols=["verified"])["verified"].map(_parse_bool)
+        summary[name] = {"rows": int(len(verified)), "unverified": int((~verified).sum())}
+    return summary
 
 
 def read_order(root: Path) -> pd.DataFrame:
@@ -188,6 +286,7 @@ def load_knowledge(
     clinical = read_table(root / "clinical_table.csv", CLINICAL_COLUMNS)
     context = read_table(root / "context_table.csv", CONTEXT_COLUMNS)
     order = read_order(root)
+    joint = read_joint(root)
 
     venomous = species["group"] == "venomous"
     dry_needed = species[venomous]
@@ -201,6 +300,7 @@ def load_knowledge(
         check_citations(clinical, bib_keys, "clinical_table.csv")
         check_citations(context, bib_keys, "context_table.csv")
         check_citations(order, bib_keys, "onset_order.csv")
+        check_citations(joint, bib_keys, "context_joint.csv")
     elif dry_needed["dry_bite_rate"].isna().any():
         warnings.warn(
             "dry_bite_rate blank for "
@@ -213,13 +313,15 @@ def load_knowledge(
         _check_verified(context, "context_table.csv")
         _check_verified(dry_needed, "species.csv")
         _check_verified(order, "onset_order.csv")
+        _check_verified(joint, "context_joint.csv")
 
     validate_symptoms(symptoms)
     validate_species(species)
     validate_clinical(clinical, set(species["species"]), set(symptoms["symptom"]))
     validate_context(context, set(species["species"]))
     validate_order(order, set(species["species"]), set(symptoms["symptom"]))
-    return KnowledgeBase(symptoms, species, clinical, context, order)
+    validate_joint(joint, set(species["species"]))
+    return KnowledgeBase(symptoms, species, clinical, context, order, joint)
 
 
 def _check_verified(table: pd.DataFrame, name: str) -> None:
@@ -260,5 +362,6 @@ def apply_overrides(kb: KnowledgeBase, overrides: list[dict] | None) -> Knowledg
                 raise ValueError(f"unknown column {col} in {name}")
             table.loc[mask, col] = value
     return KnowledgeBase(
-        kb.symptoms, tables["species"], tables["clinical"], tables["context"], kb.onset_order
+        kb.symptoms, tables["species"], tables["clinical"], tables["context"], kb.onset_order,
+        kb.context_joint,
     )

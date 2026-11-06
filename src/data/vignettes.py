@@ -4,7 +4,8 @@
     python -m src.data.vignettes ... --real data/raw/<real_cases_dir>   # mix in real cases
 
 Writes to --out:
-- vignettes.md   blinded case descriptions (no species, no label, no source)
+- vignettes.md   blinded case descriptions (no species, no label, no source, and no
+                 symptoms after presentation, which would reveal the label)
 - rating_form.csv one row per vignette for the rater: realism 1-5, syndrome guess, comments
 - answer_key.csv  vignette -> source (simulated/real), patient_id, species, syndrome (keep
                  away from raters)
@@ -48,26 +49,25 @@ def _flag(value: object, yes: str, no: str) -> str:
 
 
 def describe(patient: pd.Series, events: pd.DataFrame, names: dict[str, str]) -> str:
-    """Plain-text case: context, presentation time and the symptom timeline."""
+    """Plain-text case: context, presentation time and the symptoms seen BY presentation.
+
+    Post-presentation events are left out: they reveal the eventual syndrome, which the
+    rater has to guess blind (as the model must).
+    """
     hour = patient["hour_of_day"]
     clock = "not recorded" if pd.isna(hour) else f"{int(hour):02d}:{int((hour % 1) * 60):02d}"
     lines = [
         f"- Time of bite: {clock}; location: {_flag(patient['indoor'], 'indoors', 'outdoors')}; "
         f"asleep when bitten: {_flag(patient['asleep'], 'yes', 'no')}",
         f"- Presented to hospital {patient['presentation_hours']:.1f} h after the bite",
-        "- Symptom timeline (hours since bite):",
+        "- Symptoms up to presentation (hours since bite):",
     ]
-    timeline = events.sort_values("hours")
-    marked = False
-    for e in timeline.itertuples():
-        if not marked and e.hours > patient["presentation_hours"]:
-            lines.append("  - --- presentation ---")
-            marked = True
+    seen = events[events["hours"] <= patient["presentation_hours"]].sort_values("hours")
+    for e in seen.itertuples():
         lines.append(f"  - {e.hours:.1f} h: {names.get(e.symptom, e.symptom)}")
-    if not marked:
-        lines.append("  - --- presentation ---")
-    if timeline.empty:
-        lines.append("  - no symptoms during follow-up")
+    if seen.empty:
+        lines.append("  - no symptoms by presentation")
+    lines.append("  - --- presentation ---")
     return "\n".join(lines)
 
 
@@ -84,7 +84,7 @@ def build_kit(
         "# Snakebite case review (blinded)",
         "",
         "Rate each case for realism (1 = implausible, 5 = indistinguishable from a real patient) and",
-        "give your syndrome guess from the information up to the presentation line only:",
+        "give your syndrome guess from the information at presentation (later events are not shown):",
         "neurotoxic / haemotoxic / local-only / non-venomous-dry. Do not look anything up.",
         "",
     ]
@@ -93,9 +93,12 @@ def build_kit(
         source, patient, events = rows[i]
         vid = f"V{number:03d}"
         parts += [f"## {vid}", "", describe(pd.Series(patient), events, names), ""]
-        key.append((vid, source, patient["patient_id"], patient.get("species"), patient.get("venom_syndrome")))
+        later = int((events["hours"] > patient["presentation_hours"]).sum())
+        key.append((vid, source, patient["patient_id"], patient.get("species"), patient.get("venom_syndrome"), later))
     form = pd.DataFrame([(k[0], "", "", "", "") for k in key], columns=RATING_COLUMNS)
-    answer = pd.DataFrame(key, columns=["vignette", "source", "patient_id", "species", "venom_syndrome"])
+    answer = pd.DataFrame(
+        key, columns=["vignette", "source", "patient_id", "species", "venom_syndrome", "n_hidden_later_events"]
+    )
     return "\n".join(parts), form, answer
 
 

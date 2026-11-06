@@ -19,7 +19,16 @@ def test_describe_marks_presentation() -> None:
     text = describe(patient, events, {"ptosis": "Drooping eyelids"})
     assert "02:30" in text and "indoors" in text and "not recorded" in text
     lines = text.splitlines()
-    assert lines.index("  - 1.0 h: Drooping eyelids") < lines.index("  - --- presentation ---") < lines.index("  - 5.0 h: vomiting")
+    assert lines.index("  - 1.0 h: Drooping eyelids") < lines.index("  - --- presentation ---")
+    # Regression (Phase 1.4): post-presentation events would leak the label to raters.
+    assert "vomiting" not in text and "5.0 h" not in text
+
+
+def test_describe_without_early_symptoms() -> None:
+    patient = pd.Series({"hour_of_day": None, "indoor": None, "asleep": None, "presentation_hours": 1.0})
+    events = pd.DataFrame({"patient_id": [0], "symptom": ["ptosis"], "hours": [4.0]})
+    text = describe(patient, events, {})
+    assert "no symptoms by presentation" in text and "ptosis" not in text
 
 
 def test_kit_is_blinded_and_keyed(knowledge_dir: Path, tmp_path: Path) -> None:
@@ -33,3 +42,7 @@ def test_kit_is_blinded_and_keyed(knowledge_dir: Path, tmp_path: Path) -> None:
     for hidden in ["Species a", "neurotoxic", "simulated", "real"]:
         assert hidden not in text.split("Do not look anything up.")[1]
     assert form.drop(columns="vignette").eq("").all().all()
+    for vid, p in zip(key["vignette"], key["patient_id"]):
+        section = text.split(f"## {vid}")[1].split("## V")[0]
+        source_events = events[events["patient_id"] == p]
+        assert section.count(" h: ") <= len(source_events)

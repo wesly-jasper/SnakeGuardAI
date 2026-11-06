@@ -1,0 +1,79 @@
+# Sensitivity analysis over the disputed Phase 1 assumptions (docs/phase1_plan.md).
+# Output is SIMULATION data. Base: the evidence-only primary dataset (sim_v2).
+# basis: evidence | cited-alternative | assumption (see src/data/sensitivity.py).
+base_config: configs/sim_v2.yaml
+output_dir: data/processed/sensitivity_v2
+n_patients: 10000
+seeds: [42, 43, 44, 45, 46]
+variants:
+  - name: base
+    description: sim_v2 defaults (cited onsets only)
+    basis: evidence
+  - name: independent
+    description: severity_correlation 0 (independent symptoms)
+    basis: assumption
+    set: {severity_correlation: 0.0}
+  - name: strong_severity
+    description: severity_correlation 0.8
+    basis: assumption
+    set: {severity_correlation: 0.8}
+  - name: assumption_fallback_12h
+    description: ASSUMPTION unknown onsets filled with 0-12 h
+    basis: assumption
+    set: {onset_fallback: {hours: [0, 12], source_key: mohfw2017stg}}
+  - name: assumption_fallback_24h
+    description: ASSUMPTION unknown onsets filled with 0-24 h (mohfw2017stg 24 h observation rule; = sim_v1)
+    basis: assumption
+    set: {onset_fallback: {hours: [0, 24], source_key: mohfw2017stg}}
+  - name: assumption_fallback_48h
+    description: ASSUMPTION unknown onsets filled with 0-48 h
+    basis: assumption
+    set: {onset_fallback: {hours: [0, 48], source_key: mohfw2017stg}}
+  - name: neuro_first
+    description: neurotoxic wins over haemotoxic in mixed courses
+    basis: assumption
+    set: {syndrome_precedence: [neurotoxic, haemotoxic]}
+  - name: rv_dry_who
+    description: Russell's viper dry-bite rate 0.5 (WHO) instead of 0.036
+    basis: cited-alternative
+    knowledge_overrides:
+      - {table: species, match: {species: Daboia russelii}, set: {dry_bite_rate: 0.5}}
+  - name: cobra_no_coag
+    description: cobra coagulopathy frequency 0 (authors call it unverified)
+    basis: cited-alternative
+    knowledge_overrides:
+      - {table: clinical, match: {species: Naja naja, symptom: incoagulable_blood}, set: {frequency: 0.0}}
+  - name: krait_dry_silva
+    description: krait dry-bite rate 8/33 (silva2016krait) instead of 4/88
+    basis: cited-alternative
+    knowledge_overrides:
+      - {table: species, match: {species: Bungarus caeruleus}, set: {dry_bite_rate: 0.242}}
+  - name: delay_cumulative_reading
+    description: Kerala delay bins with '68% within 6 h' read as cumulative
+    basis: cited-alternative
+    set: {presentation_delay: {profile: kerala_adult_cumulative, open_bin_max_hours: 48}}
+  - name: delay_srilanka_paediatric
+    description: faster Sri Lankan delay bins (rathnayaka2022epidemiological, n=40)
+    basis: cited-alternative
+    set: {presentation_delay: {profile: srilanka_paediatric_hnpv, open_bin_max_hours: 24}}
+  - name: delay_open_bin_72h
+    description: open '> 24 h' delay bin capped at 72 h instead of 48 h
+    basis: assumption
+    set: {presentation_delay: {profile: kerala_adult, open_bin_max_hours: 72}}
+  - name: delay_uniform_placeholder
+    description: old uncited placeholder, uniform 0.5-24 h
+    basis: assumption
+    set: {presentation_delay: null, presentation_hours: [0.5, 24.0]}
+  - name: early_presentation
+    description: uncited uniform 0.5-6 h (stress test)
+    basis: assumption
+    set: {presentation_delay: null, presentation_hours: [0.5, 6.0]}
+  - name: echis_rajasthan
+    description: saw-scaled viper as E. c. sochureki, Rajasthan (gopalakrishnan2025antivenom)
+    basis: cited-alternative
+    knowledge_overrides:
+      - {table: clinical, match: {species: Echis carinatus, symptom: incoagulable_blood}, set: {frequency: 0.981}}
+      - {table: clinical, match: {species: Echis carinatus, symptom: systemic_bleeding}, set: {frequency: 0.524}}
+      - {table: clinical, match: {species: Echis carinatus, symptom: local_swelling}, set: {frequency: 0.943}}
+      # AKI (19/105) cannot be overridden: the base row has no frequency (sources conflict),
+      # so the loader drops it. Add a frequency to the CSV to include it.

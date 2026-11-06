@@ -16,13 +16,14 @@ study, and uses no patient data unless real cases are mixed in (see below).
 Generate the kit from a frozen dataset:
 
 ```bash
-python -m src.data.vignettes --dataset data/processed/sim_v1 --n 40 --out data/processed/review_v1
+python -m src.data.vignettes --dataset data/processed/sim_v2 --n 40 --out data/processed/review_v2
 ```
 
-- `vignettes.md`: blinded cases (no species, no label, no source), order shuffled.
+- `vignettes.md`: blinded cases (no species, no label, no source), order shuffled. Only
+  symptoms up to presentation are shown; later events would reveal the label.
 - `rating_form.csv`: one row per case: `realism_1_to_5`, `syndrome_guess`
   (neurotoxic / haemotoxic / local-only / non-venomous-dry), `confidence_1_to_5`, `comments`.
-- `answer_key.csv`: kept by the study lead only.
+- `answer_key.csv`: kept by the study lead only (includes `n_hidden_later_events`).
 
 Record the dataset's `meta.json` git commit with the results.
 

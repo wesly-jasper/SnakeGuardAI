@@ -45,6 +45,8 @@ The knowledge base in `knowledge/` (loaded by `src/data/knowledge.py`):
 | `species.csv` | species | `group` (venomous / non-venomous), `dry_bite_rate` |
 | `clinical_table.csv` | (species, symptom) | `onset_min_hours`, `onset_max_hours`, `frequency` |
 | `context_table.csv` | (species, feature) | `feature` (night / indoor / asleep), `probability` |
+| `context_joint.csv` | (species, night, indoor, asleep) | `count` (complete cases, Wijayasekara 2026 raw data) |
+| `onset_order.csv` | (species or `*`, before, after) | cited order of onset; cycles are rejected |
 | `presentation_delay.csv` | (profile, delay bin) | `min_hours`, `max_hours` (blank = open), `proportion` |
 
 Every numeric row also has `source_key` (one or more BibTeX keys from `sources.bib`,
@@ -59,11 +61,17 @@ Rows with `source_key=TODO` or blank numbers are placeholders and are skipped wi
 ## Simulated data
 
 ```bash
-python -m src.data.generate --config configs/sim_v1.yaml
+python -m src.data.validate                              # schema, citations, onset orders, delay bins
+python -m src.data.generate --config configs/sim_v2.yaml # primary, evidence-only dataset
 ```
 
-Writes `patients.csv`, `events.csv`, `meta.json` and a sanity `report.md` (with a rule-based
-syndromic baseline) to `data/processed/sim_v1/`. The venom syndrome label comes from each
+Writes `patients.csv`, `events.csv`, `meta.json`, a sanity `report.md` (with a rule-based
+syndromic baseline) and `onset_diagnostics.md` to `data/processed/sim_v2/`. `sim_v2` is the
+primary dataset: it uses cited onset windows only (`experiment_type: primary`). Filling unknown
+onsets with an assumed window (`onset_fallback`) is refused unless a config says
+`experiment_type: sensitivity` (e.g. `configs/sim_v1.yaml`, kept as a labelled sensitivity
+dataset). `meta.json` records the git commit, knowledge-file hashes, verified/unverified rows
+per table and every simulation assumption in force. The venom syndrome label comes from each
 patient's full symptom course, while the model only sees events up to presentation. All of this
 is **simulation data**. See `docs/phase1_plan.md`.
 
@@ -77,11 +85,14 @@ python -m src.data.quotecheck  # checks quotes against open full texts -> docs/q
 Robustness and realism checks (all output is simulation data):
 
 ```bash
-python -m src.data.sensitivity --config configs/sensitivity_v1.yaml
-python -m src.data.vignettes --dataset data/processed/sim_v1 --n 40 --out data/processed/review_v1
+python -m src.data.sensitivity --config configs/sensitivity_v2.yaml   # 16 variants x 5 seeds, 95% CIs
+python -m src.data.vignettes --dataset data/processed/sim_v2 --n 40 --out data/processed/review_v2
 ```
 
 See `docs/clinician_review_protocol.md` for the blinded review.
+
+CI (`.github/workflows/tests.yml`) runs `python -m src.data.validate` and the test suite on
+every push and pull request.
 
 ## Status
 

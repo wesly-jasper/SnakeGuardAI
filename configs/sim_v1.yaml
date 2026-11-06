@@ -1,12 +1,15 @@
 # Synthetic patient dataset v1. Output is SIMULATION data.
+# SUPERSEDED as the primary dataset by configs/sim_v2.yaml (Phase 1.4). Kept as a labelled
+# SENSITIVITY dataset because it fills unknown onset windows with an assumed 0-24 h fallback.
 name: sim_v1
+experiment_type: sensitivity
 seed: 42
 n_patients: 20000
 knowledge_dir: knowledge
 output_dir: data/processed/sim_v1
 # Bite-to-presentation delay: cited bins from knowledge/presentation_delay.csv.
 # kerala_adult = sajeethkumar2018clinical (n=1,500, North Kerala). The '> 24 h' bin has no
-# reported upper bound; open_bin_max_hours is an assumption (varied in sensitivity_v1).
+# reported upper bound; open_bin_max_hours is an assumption (varied in sensitivity_v2).
 presentation_delay:
   profile: kerala_adult
   open_bin_max_hours: 48

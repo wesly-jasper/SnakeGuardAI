@@ -37,6 +37,16 @@ def unverified_rows(knowledge_dir: Path) -> pd.DataFrame:
         kb.context.assign(table="context_table.csv", item=kb.context["species"] + " / " + kb.context["feature"],
                           value=kb.context["probability"].map(str)),
     ]
+    order = kb.onset_order
+    parts.append(order.assign(table="onset_order.csv", item=order["species"] + " / " + order["before"],
+                              value="before " + order["after"]))
+    joint = kb.context_joint
+    parts.append(joint.assign(
+        table="context_joint.csv",
+        item=joint["species"] + " / night=" + joint["night"].map(str) + ", indoor=" + joint["indoor"].map(str)
+        + ", asleep=" + joint["asleep"].map(str),
+        value=joint["count"].map(str),
+    ))
     delay_path = knowledge_dir / "presentation_delay.csv"
     if delay_path.exists():
         delay = read_table(delay_path, DELAY_COLUMNS)
@@ -45,7 +55,8 @@ def unverified_rows(knowledge_dir: Path) -> pd.DataFrame:
             item=delay["profile"] + " / " + delay["min_hours"].map(str) + "-" + delay["max_hours"].map(lambda v: "open" if pd.isna(v) else str(v)) + " h",
             value=delay["proportion"].map(str),
         ))
-    rows = pd.concat([p[~p["verified"]][["source_key", "table", "item", "value", "evidence"]] for p in parts])
+    rows = pd.concat([p[~p["verified"].astype(bool)][["source_key", "table", "item", "value", "evidence"]]
+                      for p in parts if len(p)])
     rows = rows.assign(source=rows["source_key"].map(lambda k: (split_keys(k) or ["(none)"])[0]))
     return rows.sort_values(["source", "table", "item"]).reset_index(drop=True)
 

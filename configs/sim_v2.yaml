@@ -1,0 +1,26 @@
+# Synthetic patient dataset v2: PRIMARY, evidence-grounded. Output is SIMULATION data.
+# Uses only cited onset windows: clinical rows whose onset is unknown are excluded (no
+# fallback window). Assumption-based variants live in configs/sensitivity_v2.yaml.
+name: sim_v2
+experiment_type: primary
+seed: 42
+n_patients: 20000
+knowledge_dir: knowledge
+output_dir: data/processed/sim_v2
+# Bite-to-presentation delay: cited bins from knowledge/presentation_delay.csv.
+# kerala_adult = sajeethkumar2018clinical (n=1,500, North Kerala). The '> 24 h' bin has no
+# reported upper bound; open_bin_max_hours is an assumption (varied in sensitivity_v2).
+presentation_delay:
+  profile: kerala_adult
+  open_bin_max_hours: 48
+species_weights: null          # uniform until a cited epidemiological mix is chosen
+syndrome_precedence: [haemotoxic, neurotoxic]
+# Shared latent severity (Gaussian copula). Modelling assumption with no cited value yet:
+# 0 = independent symptoms. Varied 0-0.8 in configs/sensitivity_v2.yaml.
+severity_correlation: 0.5
+onset_fallback: null           # unknown onsets are excluded, never filled, in the primary dataset
+max_order_tries: 100           # redraws for onset orders the push alone cannot satisfy
+diagnostics_n_per_species: 2000
+splits: {train: 0.6, calibration: 0.2, test: 0.2}
+require_citations: false       # set true once knowledge/ is fully filled
+require_verified: false        # set true once every row is human-checked

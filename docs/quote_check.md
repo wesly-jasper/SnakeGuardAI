@@ -15,14 +15,14 @@ plus any bib key named in the evidence. `abstract` sources only contain the abst
 
 | status | rows |
 |---|---|
-| found | 53 |
+| found | 57 |
 | partial | 7 |
 | not_found | 15 |
 | no_quote | 19 |
-| source_unavailable | 0 |
-| **total** | **94** |
+| source_unavailable | 1 |
+| **total** | **99** |
 
-## found (53)
+## found (57)
 
 | table | item | source(s) | fragment(s) missing |
 |---|---|---|---|
@@ -79,6 +79,10 @@ plus any bib key named in the evidence. `abstract` sources only contain the abst
 | presentation_delay.csv | srilanka_paediatric_hnpv / 4-6 h | rathnayaka2022epidemiological (fulltext) | - |
 | presentation_delay.csv | srilanka_paediatric_hnpv / 6-8 h | rathnayaka2022epidemiological (fulltext) | - |
 | presentation_delay.csv | srilanka_paediatric_hnpv / 8-open h | rathnayaka2022epidemiological (fulltext) | - |
+| onset_order.csv | * / ptosis -> ophthalmoplegia | mohfw2017stg (pdf), silva2016krait (fulltext) | - |
+| onset_order.csv | * / ophthalmoplegia -> bulbar_palsy | mohfw2017stg (pdf), silva2016krait (fulltext) | - |
+| onset_order.csv | * / bulbar_palsy -> respiratory_paralysis | mohfw2017stg (pdf) | - |
+| onset_order.csv | * / bulbar_palsy -> limb_weakness | mohfw2017stg (pdf) | - |
 
 ## partial (7)
 
@@ -135,6 +139,12 @@ plus any bib key named in the evidence. `abstract` sources only contain the abst
 | context_table.csv | Ptyas mucosa / asleep | wijayasekara2026patterns (fulltext) | - |
 | context_table.csv | Ptyas mucosa / indoor | wijayasekara2026patterns (fulltext) | - |
 | context_table.csv | Ptyas mucosa / night | wijayasekara2026patterns (fulltext) | - |
+
+## source_unavailable (1)
+
+| table | item | source(s) | fragment(s) missing |
+|---|---|---|---|
+| onset_order.csv | Bungarus caeruleus / abdominal_pain -> ptosis | kularatne1998krait (unavailable) | 'Abdominal pain is the first symptom that manifests after krait bite, within minutes to few hours' |
 
 ## Sources
 

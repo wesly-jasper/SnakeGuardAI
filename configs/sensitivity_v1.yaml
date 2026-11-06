@@ -1,4 +1,5 @@
 # Sensitivity analysis over the disputed Phase 1 assumptions (docs/phase1_plan.md).
+# SUPERSEDED by configs/sensitivity_v2.yaml (evidence-only base, 5 seeds, labelled bases).
 # Output is SIMULATION data.
 base_config: configs/sim_v1.yaml
 output_dir: data/processed/sensitivity_v1

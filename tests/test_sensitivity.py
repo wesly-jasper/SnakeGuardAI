@@ -7,7 +7,7 @@ import pytest
 
 from src.data.generate import generate
 from src.data.knowledge import apply_overrides, load_knowledge
-from src.data.sensitivity import summarise, variant_config
+from src.data.sensitivity import summarise, t_interval, variant_config
 
 
 def test_apply_overrides(knowledge_dir: Path) -> None:
@@ -47,3 +47,43 @@ def test_variant_config_and_summary(knowledge_dir: Path, tmp_path: Path) -> None
     row = summarise(meta, variant)
     assert row["variant"] == "dry" and 0 <= row["critical_error_rate"] <= 1
     assert meta["config"]["knowledge_overrides"][0]["set"]["dry_bite_rate"] == 1.0
+
+
+def test_multi_seed_run_and_intervals(knowledge_dir: Path, tmp_path: Path) -> None:
+    import yaml
+
+    from src.data.sensitivity import aggregate, render, run, t_interval
+
+    base = {"name": "b", "seed": 3, "n_patients": 200, "knowledge_dir": str(knowledge_dir),
+            "output_dir": "unused"}
+    (tmp_path / "base.yaml").write_text(yaml.safe_dump(base))
+    sens = {
+        "base_config": str(tmp_path / "base.yaml"), "output_dir": str(tmp_path / "sens"), "seeds": [1, 2, 3],
+        "variants": [
+            {"name": "base"},
+            {"name": "fb", "basis": "assumption",
+             "set": {"onset_fallback": {"hours": [0, 24], "source_key": "fake2026"}}},
+        ],
+    }
+    per_seed = run(sens)
+    assert len(per_seed) == 6 and set(per_seed["seed"]) == {1, 2, 3}
+    meta = json.loads((tmp_path / "sens" / "fb" / "seed_1" / "meta.json").read_text())
+    assert meta["experiment_type"] == "sensitivity"  # fallback only inside labelled runs
+    assert (tmp_path / "sens" / "base" / "seed_1" / "patients.csv").exists()
+    assert not (tmp_path / "sens" / "base" / "seed_2" / "patients.csv").exists()
+    summary = aggregate(per_seed)
+    row = summary.set_index("variant").loc["base"]
+    assert row["n_seeds"] == 3
+    assert row["critical_error_rate_ci_low"] <= row["critical_error_rate"] <= row["critical_error_rate_ci_high"]
+    assert "assumption" in render(summary, sens)
+    with pytest.raises(ValueError, match="basis"):
+        run({**sens, "variants": [{"name": "x", "basis": "guess"}]})
+
+
+def test_t_interval() -> None:
+    import pandas as pd
+
+    mean, lo, hi = t_interval(pd.Series([1.0, 2.0, 3.0]))
+    assert mean == 2.0 and lo == pytest.approx(2 - 4.303 / 3 ** 0.5, abs=1e-3) and hi > 3
+    mean, lo, hi = t_interval(pd.Series([5.0]))
+    assert mean == 5.0 and pd.isna(lo)

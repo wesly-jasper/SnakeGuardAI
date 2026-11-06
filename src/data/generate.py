@@ -1,12 +1,18 @@
 """Generate a synthetic patient dataset from a YAML config.
 
-    python -m src.data.generate --config configs/sim_v1.yaml
+    python -m src.data.generate --config configs/sim_v2.yaml
 
 Writes to the config's `output_dir`:
 - patients.csv  one row per patient (labels, context, observed onsets, split)
-- events.csv    full symptom courses with an `observed` flag
-- meta.json     config, git commit, knowledge-file hashes, SIMULATED flag
+- events.csv    full symptom courses with `observed` and `onset_assumed` flags
+- meta.json     config, git commit, knowledge-file hashes, verification status per table,
+                experiment type, assumptions in force, SIMULATED flag
 - report.md     sanity report and rule-based baseline (src/data/report.py)
+- onset_diagnostics.md  copula / onset-order checks (src/data/diagnostics.py)
+
+`experiment_type: primary` (the default) uses cited evidence only; assumption-based
+settings such as `onset_fallback` are refused unless the config says
+`experiment_type: sensitivity`.
 
 All outputs are SIMULATION data.
 """
@@ -16,18 +22,32 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import subprocess
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from src.data.knowledge import apply_overrides, load_knowledge, read_bib_keys, split_keys
+from src.data.diagnostics import onset_diagnostics
+from src.data.diagnostics import render as render_diagnostics
+from src.data.diagnostics import summarise as summarise_diagnostics
+from src.data.knowledge import (
+    apply_overrides,
+    load_knowledge,
+    read_bib_keys,
+    split_keys,
+    verification_summary,
+)
 from src.data.presentation import DelayDistribution, load_delay
 from src.data.report import baseline_metrics, build_report, rule_predictions
 from src.data.simulator import (
+    DEFAULT_MAX_ORDER_TRIES,
     DEFAULT_PRECEDENCE,
+    SpeciesSpec,
     assign_splits,
+    build_specs,
+    check_count,
     count_fallback_rows,
     events_dataframe,
     simulate_patients,
@@ -36,6 +56,7 @@ from src.data.simulator import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SPLITS = {"train": 0.6, "calibration": 0.2, "test": 0.2}
+PRIMARY, SENSITIVITY = "primary", "sensitivity"
 
 
 def load_config(path: str | Path) -> dict[str, Any]:
@@ -81,8 +102,8 @@ def onset_fallback(config: dict[str, Any], knowledge_dir: Path) -> tuple[float, 
     if not keys or not set(keys) <= read_bib_keys(knowledge_dir / "sources.bib"):
         raise ValueError("onset_fallback needs a source_key present in sources.bib")
     lo, hi = (float(h) for h in spec["hours"])
-    if not 0 <= lo <= hi:
-        raise ValueError("onset_fallback hours must satisfy 0 <= lo <= hi")
+    if not (math.isfinite(lo) and math.isfinite(hi) and 0 <= lo <= hi):
+        raise ValueError("onset_fallback hours must be finite with 0 <= lo <= hi")
     return lo, hi
 
 
@@ -91,32 +112,81 @@ def presentation_delay(config: dict[str, Any], knowledge_dir: Path) -> DelayDist
     spec = config.get("presentation_delay")
     if not spec:
         return None
-    return load_delay(knowledge_dir, spec["profile"], float(spec["open_bin_max_hours"]))
+    return load_delay(
+        knowledge_dir, spec["profile"], float(spec["open_bin_max_hours"]),
+        require_verified=config.get("require_verified", False),
+    )
+
+
+def experiment_type(config: dict[str, Any], fallback: tuple[float, float] | None) -> str:
+    """`primary` (evidence only) or `sensitivity`; assumption-based settings need the latter."""
+    kind = config.get("experiment_type", PRIMARY)
+    if kind not in {PRIMARY, SENSITIVITY}:
+        raise ValueError(f"experiment_type must be {PRIMARY!r} or {SENSITIVITY!r}")
+    if fallback is not None and kind != SENSITIVITY:
+        raise ValueError(
+            "onset_fallback fills unknown onsets with an assumed window; it is only allowed in "
+            "configs labelled `experiment_type: sensitivity`"
+        )
+    return kind
+
+
+def assumptions(
+    config: dict[str, Any], fallback: tuple[float, float] | None, specs: dict[str, SpeciesSpec]
+) -> list[str]:
+    """Simulation assumptions (not clinical evidence) in force for this dataset."""
+    items = [
+        f"severity_correlation {config.get('severity_correlation', 0.0)} (Gaussian copula; no cited value)",
+        "onset uniform within each cited window before copula skew and ordering",
+        "species mix " + ("from species_weights (config)" if config.get("species_weights") else "uniform"),
+        "GPS and month uniform (placeholder until the Phase 3 geo prior)",
+        "hour of day uniform within the cited day/night half",
+    ]
+    if fallback is not None:
+        items.append(f"ASSUMPTION: onset_fallback window {fallback} h for rows with unknown onset")
+    else:
+        items.append("rows with unknown onset are excluded, so those symptoms never occur")
+    delay = config.get("presentation_delay")
+    if delay:
+        items.append(
+            f"open presentation-delay bin capped at {delay['open_bin_max_hours']} h; uniform within bins; "
+            "unreported share of the source assumed to follow the reported bins"
+        )
+    else:
+        items.append(f"presentation delay uniform {config.get('presentation_hours', (0.5, 24.0))} h (uncited)")
+    marginal_only = sorted(s for s, spec in specs.items() if spec.joint_context is None and spec.context)
+    if marginal_only:
+        items.append(f"context flags drawn independently (no cited joint counts) for {marginal_only}")
+    return items
 
 
 def generate(config: dict[str, Any]) -> Path:
     """Simulate patients per `config` and write the dataset; returns the output dir."""
     knowledge_dir = resolve(config.get("knowledge_dir", "knowledge"))
     fallback = onset_fallback(config, knowledge_dir)
+    kind = experiment_type(config, fallback)
     kb = load_knowledge(
         knowledge_dir,
         require_citations=config.get("require_citations", False),
         require_verified=config.get("require_verified", False),
-        allow_missing_onset=fallback is not None,
+        allow_missing_onset=True,  # unknown-onset rows are counted here and excluded or filled in build_specs
     )
     kb = apply_overrides(kb, config.get("knowledge_overrides"))
     precedence = tuple(config.get("syndrome_precedence", DEFAULT_PRECEDENCE))
     delay = presentation_delay(config, knowledge_dir)
+    rho = float(config.get("severity_correlation", 0.0))
+    max_tries = int(config.get("max_order_tries", DEFAULT_MAX_ORDER_TRIES))
     patients = simulate_patients(
         kb,
-        n=int(config["n_patients"]),
+        n=check_count(config["n_patients"], "n_patients"),
         seed=int(config["seed"]),
         species_weights=config.get("species_weights"),
         presentation_hours_range=tuple(config.get("presentation_hours", (0.5, 24.0))),
         precedence=precedence,
         onset_fallback=fallback,
-        severity_correlation=float(config.get("severity_correlation", 0.0)),
+        severity_correlation=rho,
         presentation_delay=delay,
+        max_order_tries=max_tries,
     )
     table = to_dataframe(patients)
     table["split"] = assign_splits(len(patients), config.get("splits", DEFAULT_SPLITS), int(config["seed"]))
@@ -124,41 +194,79 @@ def generate(config: dict[str, Any]) -> Path:
     out = resolve(config["output_dir"])
     out.mkdir(parents=True, exist_ok=True)
     table.to_csv(out / "patients.csv", index=False)
-    events_dataframe(patients).to_csv(out / "events.csv", index=False)
-    n_fallback = count_fallback_rows(kb) if fallback else 0
+    events = events_dataframe(patients)
+    events.to_csv(out / "events.csv", index=False)
+
+    specs = build_specs(kb, fallback)
+    n_diag = check_count(config.get("diagnostics_n_per_species", 2000), "diagnostics_n_per_species")
+    marginals, pairs = onset_diagnostics(specs, n_diag, int(config["seed"]), rho, max_tries)
+    (out / "onset_diagnostics.md").write_text(render_diagnostics(marginals, pairs, n_diag), encoding="utf-8")
+
+    n_unknown = count_fallback_rows(kb)
     test = [p for p, s in zip(patients, table["split"]) if s == "test"] if patients else []
     baseline = (
         baseline_metrics([p.venom_syndrome for p in test], rule_predictions(test, kb.marker_of(), precedence))
         if test else {}
     )
+    verification = verification_summary(knowledge_dir)
     meta = {
         "SIMULATED": True,
         "note": "Synthetic patients from a literature-derived table. Results are simulation results.",
+        "experiment_type": kind,
         "config": config,
         "git_commit": git_commit(),
         "knowledge_hashes": file_hashes(knowledge_dir),
+        "verification": verification,
+        "n_rows_unverified": sum(t["unverified"] for t in verification.values()),
+        "require_verified": bool(config.get("require_verified", False)),
+        "assumptions": assumptions(config, fallback, specs),
         "n_patients": len(patients),
-        "n_clinical_rows_using_onset_fallback": n_fallback,
+        "n_clinical_rows_using_onset_fallback": n_unknown if fallback else 0,
+        "n_clinical_rows_excluded_unknown_onset": 0 if fallback else n_unknown,
+        "n_events_with_assumed_onset": int(events["onset_assumed"].sum()) if len(events) else 0,
+        # Envenomed (not dry-bite) patients whose sampled course is empty: with unknown-onset
+        # rows excluded, these get the dry label although the bite was not dry (label artefact).
+        "n_envenomed_without_any_symptom": sum(
+            1 for p in patients if specs[p.species].venomous and not p.dry_bite and not p.course
+        ),
+        "n_patients_with_order_violations": int((table["order_violations"] > 0).sum()) if len(table) else 0,
+        "onset_diagnostics": summarise_diagnostics(marginals, pairs),
+        "joint_context_species": sorted(s for s, spec in specs.items() if spec.joint_context is not None),
+        "presentation_delay": delay.summary() if delay else None,
         "presentation_hours_summary": (
             table["presentation_hours"].describe(percentiles=[0.25, 0.5, 0.75]).round(2).to_dict()
             if len(table) else {}
         ),
-        "n_rows_unverified": int((~kb.clinical["verified"]).sum() + (~kb.context["verified"]).sum()),
         "syndrome_counts": table["venom_syndrome"].value_counts().to_dict() if len(table) else {},
         "rule_baseline_test": baseline,
     }
     (out / "meta.json").write_text(json.dumps(meta, indent=2, default=str), encoding="utf-8")
     if patients:
-        notes = [
-            f"config `{config['name']}`, seed {config['seed']}, commit `{meta['git_commit']}`",
-            f"{n_fallback} clinical row(s) use the fallback onset window {fallback}" if fallback else "no onset fallback",
-            f"{meta['n_rows_unverified']} knowledge row(s) not yet human-verified",
-            (f"presentation delay: cited profile `{config['presentation_delay']['profile']}`"
-             if delay else f"presentation delay: uniform {config.get('presentation_hours', (0.5, 24.0))} h (uncited)"),
-        ]
-        report = build_report(patients, table["split"].tolist(), kb, precedence, notes)
+        report = build_report(patients, table["split"].tolist(), kb, precedence, report_notes(meta, config, fallback, delay))
         (out / "report.md").write_text(report, encoding="utf-8")
     return out
+
+
+def report_notes(
+    meta: dict[str, Any], config: dict[str, Any], fallback: tuple[float, float] | None,
+    delay: DelayDistribution | None,
+) -> list[str]:
+    verification = ", ".join(f"{k} {v['unverified']}/{v['rows']}" for k, v in meta["verification"].items())
+    return [
+        f"config `{config['name']}` ({meta['experiment_type']} experiment), seed {config['seed']}, "
+        f"commit `{meta['git_commit']}`",
+        (f"ASSUMPTION: {meta['n_clinical_rows_using_onset_fallback']} clinical row(s) use the fallback "
+         f"onset window {fallback}" if fallback
+         else f"{meta['n_clinical_rows_excluded_unknown_onset']} clinical row(s) with unknown onset excluded"),
+        f"{meta['n_rows_unverified']} knowledge row(s) not yet human-verified ({verification})",
+        f"{meta['n_envenomed_without_any_symptom']} envenomed (non-dry-bite) patient(s) have no symptom in "
+        "their course and are labelled non-venomous/dry (label artefact of excluding unknown onsets)",
+        f"{meta['n_patients_with_order_violations']} patient(s) still violate an onset order "
+        "(see onset_diagnostics.md)",
+        (f"presentation delay: cited profile `{config['presentation_delay']['profile']}` "
+         f"(unreported share of source {delay.unreported:.0%})" if delay
+         else f"presentation delay: uniform {config.get('presentation_hours', (0.5, 24.0))} h (uncited)"),
+    ]
 
 
 def main(argv: list[str] | None = None) -> None:

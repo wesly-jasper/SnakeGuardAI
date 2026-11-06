@@ -73,7 +73,7 @@ Sources, preferring authenticated (snake identified) case series from South Asia
 - All rows are `verified=true` after human review against PDFs.
 - `generate` produces a reproducible dataset; tests pass.
 
-## Status (2026-11-06): engineering complete, human verification pending
+## Status (2026-11-06): engineering complete (Phase 1.4 hardening done), human verification pending
 
 Done:
 - Schema, loader, simulator (course labels, censoring, dry bites, context), generation CLI,
@@ -127,7 +127,64 @@ Research-grade additions (2026-11-06):
     <= 0.05.
 - Clinician review kit (`python -m src.data.vignettes`, `docs/clinician_review_protocol.md`):
   blinded vignettes, rating form, answer key; can mix in real cases for a real-vs-simulated test.
-- Tests: 90, passing on system Python (pandas 2.3) and the project .venv (pandas 3.1).
+- Tests: 164 after Phase 1.4, passing on system Python (pandas 2.3) and the project .venv (pandas 3.1).
+
+Phase 1.4 hardening (2026-11-06). All numbers are SIMULATION results, not clinical validation:
+- Primary dataset is now `configs/sim_v2.yaml` (`experiment_type: primary`): cited onset windows
+  only. The 27 clinical rows with an unknown onset are excluded, never filled. The 0-24 h onset
+  fallback is refused unless a config says `experiment_type: sensitivity`; `sim_v1` is kept as a
+  labelled sensitivity dataset, and every fallback event carries `onset_assumed=true` in events.csv.
+- Onset order: violations are counted after the push; partly overlapping windows are redrawn
+  (up to `max_order_tries`, same severity and presence) and any remaining violation is flagged
+  per patient (`order_violations`), never reported as satisfied. Windows that make an order
+  impossible (direct or along a chain) raise an error; cycles in onset_order.csv are rejected.
+  sim_v2: 6 rules (5 compatible, 1 partial: krait ophthalmoplegia 0.5-12 h -> bulbar 0.5-7 h);
+  270 krait courses needed a redraw; 0 violations remain.
+- Copula x order diagnostics (`onset_diagnostics.md` per dataset): pre-order onsets pass a KS test
+  against Uniform(window) for every symptom (min p = 0.16); ordering moves onset distributions
+  by up to KS D = 0.26 (later signs pushed later; conditioning on a partial order pulls the
+  earlier sign earlier). Statistical regression tests cover marginal frequencies, uniform
+  pre-order onsets and the measured shift.
+- Context (night, indoor, asleep) is sampled jointly from complete-case counts
+  (`knowledge/context_joint.csv`, Wijayasekara 2026 raw data) for krait, cobra, Russell's viper and
+  the pooled non-venomous species; Echis and Hypnale stay independent (marginals only).
+- Validation: species weights, patient counts, split fractions, correlation, presentation ranges,
+  delay bins (single open bin, last; sum <= 1; no overlap) and non-finite numbers are rejected.
+  The unreported share of each delay series (Kerala: 4%) is recorded in meta.json.
+- Verification is reported for all six evidence tables (meta.json `verification`); `require_verified`
+  covers clinical, species, context, joint context, onset order and presentation delay.
+  Current state: 150 rows, 0 verified.
+- Vignettes show only symptoms up to presentation (later events leaked the label).
+- CI: `.github/workflows/tests.yml` runs `python -m src.data.validate` and pytest.
+- sim_v2 rule baseline (test split, n=4,000): accuracy 0.77, macro-F1 0.67, critical error 0.24.
+  Label artefact: 1,681 of 11,454 envenomed (non-dry-bite) patients have no symptom left once
+  unknown-onset rows are excluded (cobra 1,008, saw-scaled viper 407, Russell's viper 266) and get
+  the dry label (`n_envenomed_without_any_symptom` in meta.json). This makes the dry class
+  partly artificial and the critical error rate optimistic; see limitations below.
+- Sensitivity v2 (`configs/sensitivity_v2.yaml`, base sim_v2, 16 variants x 5 seeds x 10k
+  patients; mean [95% t-interval across seeds]; critical error rate):
+  - base (evidence): 0.253 [0.245, 0.261]; macro-F1 0.653 [0.643, 0.664]
+  - assumption, onset fallback 0-12 / 0-24 / 0-48 h: 0.291 / 0.319 / 0.338
+  - assumption, severity correlation 0 / 0.8: 0.260 / 0.240 (intervals overlap the base)
+  - cited-alternative delay, Sri Lankan paediatric profile: 0.421 [0.410, 0.432]
+  - assumption, old uniform 0.5-24 h delay: 0.077 (the placeholder made the task look easy)
+  - cited-alternative Echis (Rajasthan): 0.223; Russell's viper dry 50% (WHO): 0.245
+  - no effect in the evidence-only base: cobra coagulopathy (its row has no cited onset, so it is
+    already excluded), syndrome precedence, open delay bin 48 vs 72 h.
+
+Scientific limitations (Phase 1.4):
+- Excluding unknown onsets removes cited symptoms entirely, which mislabels about 15% of
+  envenomed patients as dry; filling them (sim_v1) invents timing. Neither is evidence; a third
+  option (count the symptom for the label, hide it from the model input) needs a decision.
+- Order redraws condition onsets on the order, so the cited windows hold but marginals within
+  them shift (quantified in onset_diagnostics.md, not removed).
+- Severity correlation, uniform-within-window onsets, uniform-within-bin delays, the 48 h open
+  delay cap and uniform species/GPS/month are uncited modelling choices (listed in each
+  meta.json `assumptions`).
+- One delay distribution (North Kerala adults) for every species and region.
+- Joint context counts are from Sri Lanka (Anuradhapura), pooled for non-venomous species, with
+  sparse cells (cobra: 60 complete cases).
+- All 150 knowledge rows are AI-assisted drafts; nothing is human-verified.
 
 Next evidence priorities (from the sensitivity analysis):
 1. Done: cited bite-to-presentation distribution (see above). Still open: a delay series from a

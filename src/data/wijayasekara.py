@@ -10,7 +10,9 @@ Definitions (match the simulator):
 - night:  time of bite in [18:00, 06:00)
 - indoor: bite place mentions house/home/inside/room and not garden/compound
 - asleep: activity mentions "sleep"
-Blank cells are excluded from each denominator. On the krait and cobra rows these rules
+Blank cells are excluded from each denominator. `joint_rows` also writes
+knowledge/context_joint.csv: counts of every (night, indoor, asleep) combination over the
+bites with all three recorded (complete cases), so the simulator can sample them jointly. On the krait and cobra rows these rules
 reproduce the paper's Table 1 (krait indoor 61% vs 61.5%, asleep 62% vs 60.6%).
 """
 
@@ -101,6 +103,36 @@ def context_rows(bites: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["species", "feature", "probability", "source_key", "evidence", "verified"])
 
 
+def joint_rows(bites: pd.DataFrame) -> pd.DataFrame:
+    """context_joint.csv rows: complete-case counts of each (night, indoor, asleep) cell.
+
+    All 8 cells are listed per snake code, including zero counts, so absent combinations
+    are explicit. Pooled non-venomous counts are repeated for each non-venomous species.
+    """
+    flags = context_flags(bites)
+    features = ["night", "indoor", "asleep"]
+    rows = []
+    for code, species_list in SNAKE_CODES.items():
+        complete = flags.loc[flags["Snake"] == code, features].dropna().astype(bool)
+        if complete.empty:
+            continue
+        counts = complete.value_counts()
+        pooled = " POOLED non-venomous, not species-specific;" if code == "Non-V" else ""
+        for night in (False, True):
+            for indoor in (False, True):
+                for asleep in (False, True):
+                    k = int(counts.get((night, indoor, asleep), 0))
+                    evidence = (
+                        f"S1 Appendix Data.xlsx, Snake='{code}':{pooled} {k}/{len(complete)} complete cases "
+                        "(derived by src/data/wijayasekara.py joint_rows)"
+                    )
+                    for species in species_list:
+                        rows.append((species, night, indoor, asleep, k, SOURCE_KEY, evidence, False))
+    return pd.DataFrame(
+        rows, columns=["species", "night", "indoor", "asleep", "count", "source_key", "evidence", "verified"]
+    )
+
+
 def merge_into(context_table: pd.DataFrame, new_rows: pd.DataFrame) -> pd.DataFrame:
     """Replace (species, feature) rows in `context_table` with `new_rows`."""
     keys = set(zip(new_rows["species"], new_rows["feature"]))
@@ -112,11 +144,16 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("xlsx", help="path to the S1 Appendix Data.xlsx")
     parser.add_argument("--context-table", default="knowledge/context_table.csv")
+    parser.add_argument("--joint-table", default="knowledge/context_joint.csv")
     args = parser.parse_args(argv)
-    new_rows = context_rows(read_first_sheet(args.xlsx))
+    bites = read_first_sheet(args.xlsx)
+    new_rows = context_rows(bites)
     table = pd.read_csv(args.context_table, dtype={"source_key": str, "evidence": str})
     merge_into(table, new_rows).to_csv(args.context_table, index=False)
     print(new_rows.drop(columns="evidence").to_string(index=False))
+    joint = joint_rows(bites)
+    joint.to_csv(args.joint_table, index=False)
+    print(f"wrote {len(joint)} joint context rows to {args.joint_table}")
 
 
 if __name__ == "__main__":
