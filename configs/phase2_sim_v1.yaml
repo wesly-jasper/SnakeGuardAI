@@ -1,0 +1,30 @@
+# Phase 2 SENSITIVITY run on sim_v1 (unknown onsets filled with the 0-24 h fallback window, an assumption).
+# All results are SIMULATION results.
+#   python -m src.data.generate --config configs/sim_v1.yaml   # if data/processed/sim_v1 is missing
+#   python -m src.train --config configs/phase2_sim_v1.yaml
+name: phase2_sim_v1
+dataset: data/processed/sim_v1
+output_dir: outputs/phase2/sim_v1
+seeds: [0, 1, 2]
+validation_fraction: 0.15   # carved out of the train split for early stopping
+torch_threads: 4
+models:
+  prior: {}
+  rule: {}
+  xgboost:
+    params: {n_estimators: 600, max_depth: 4, learning_rate: 0.05, subsample: 0.9,
+             colsample_bytree: 0.9, early_stopping_rounds: 30}
+  xgboost_context:
+    params: {n_estimators: 600, max_depth: 4, learning_rate: 0.05, subsample: 0.9,
+             colsample_bytree: 0.9, early_stopping_rounds: 30}
+  transformer:
+    d_model: 64
+    n_heads: 4
+    n_layers: 2
+    dropout: 0.1
+    lr: 0.001
+    weight_decay: 0.01
+    batch_size: 256
+    max_epochs: 60
+    patience: 8
+    species_loss_weight: 1.0

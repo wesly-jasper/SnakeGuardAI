@@ -96,12 +96,26 @@ See `docs/clinician_review_protocol.md` for the blinded review.
 CI (`.github/workflows/tests.yml`) runs `python -m src.data.validate` and the test suite on
 every push and pull request.
 
+## Phase 2: symptom-only baselines
+
+```bash
+python -m src.train --config configs/phase2_sim_v2.yaml   # prior, rule, XGBoost, symptom transformer
+python -m src.evaluate --run outputs/phase2/sim_v2         # recompute metrics from saved predictions
+```
+
+`src/data/dataset.py` builds the model input from what is known at presentation: the
+observed symptoms (onset time, time since onset) and the presentation time. Label-only
+events and events after presentation never reach the model. Learned models train on the
+`train` split (minus a validation subset for early stopping) over 3 seeds; the `calibration`
+split is never fitted on, and its probabilities are saved for the Phase 6 conformal gate.
+`outputs/phase2/sim_v2/report.md` has the tables (SIMULATION results). See `docs/phase2_results.md`.
+
 ## Status
 
 - [x] Phase 0: repo, environment, tests
 - [x] Phase 1: clinical knowledge table + simulator (engineering done; rows await human verification,
       see docs/verification_checklist.md). GPS and month are uniform placeholders until Phase 3.
-- [ ] Phase 2: symptom-only baselines
+- [x] Phase 2: symptom-only baselines (prior, rule, XGBoost, symptom transformer; see docs/phase2_results.md)
 - [ ] Phase 3: geographic prior (GBIF)
 - [ ] Phase 4: image branch (SnakeCLEF)
 - [ ] Phase 5: missing-modality fusion
