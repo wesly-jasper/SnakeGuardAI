@@ -263,14 +263,22 @@ Re-run with the new metadata; the numbers are identical to the hardening section
 ### Reproduction and verification
 
 `python -m src.verify_runs <run dirs>` re-checks every training run (sim_v2, sim_v1,
-sim_v2_early_local, sim_v2_stratified and the five simulator-seed runs; 149 prediction files):
+sim_v2_early_local, sim_v2_stratified and the five simulator-seed runs; 150 prediction files):
 - every saved patient is in its recorded split, with the dataset's labels;
 - fit and validation patients are exactly the train split, for every seed;
 - calibrators were fitted on exactly the calibration split;
 - every test metric regenerates from the saved predictions to within 1e-9.
 
-No problems were found. The commit each output was produced from is recorded in its
-`run.json` (`git.commit`, `git.dirty`).
+No problems were found.
+
+**Clean-commit reproduction.** Every number in this document was regenerated from the clean
+commit `0ec7c3c` (working tree clean before and after; 2026-11-07, 03:01-03:58).
+- All four datasets were regenerated first. Their patients.csv and events.csv are byte-identical
+  to the earlier ones.
+- All 13 `run.json` files record `git.commit = 0ec7c3c…`, `git.dirty = false` and status `complete`.
+- Every table above matches the regenerated `metrics.json`, `seed_variability.json`,
+  `explanations.json`, `ablation.json` and `robustness.json`.
+- Later commits change only documentation (`git diff 0ec7c3c -- src configs tests` is empty).
 
 ## Limitations
 
