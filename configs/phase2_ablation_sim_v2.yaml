@@ -1,0 +1,27 @@
+# Phase 2 input ablations on the primary simulated dataset (sim_v2). SIMULATION results only.
+#   python -m src.ablation --config configs/phase2_ablation_sim_v2.yaml
+# The dataset, labels and splits are never changed; only the model's inputs. Results show what
+# this model uses on simulated data, not causal clinical evidence.
+name: phase2_ablation_sim_v2
+dataset: data/processed/sim_v2
+output_dir: outputs/phase2/ablation_sim_v2
+seeds: [0, 1, 2]
+validation_fraction: 0.15
+torch_threads: 4
+decision_thresholds: [0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5]
+reference: A_full
+model:
+  kind: xgboost
+  heads: [syndrome]
+  params: {n_estimators: 600, max_depth: 4, learning_rate: 0.05, subsample: 0.9,
+           colsample_bytree: 0.9, early_stopping_rounds: 30}
+leave_one_out: true             # E: one experiment per symptom observed at least once in the inputs
+experiments:
+  A_full: {}
+  B_presence_only: {onset: false, elapsed: false}
+  C_temporal_only: {symptom_identity: false}
+  D_no_presentation: {presentation: false, elapsed: false}
+  F_no_local: {drop_groups: [local]}
+  G_no_systemic: {drop_groups: [systemic]}
+  H_context_only: {symptoms: false, presentation: false, context: true}
+  I_symptoms_plus_context: {context: true}

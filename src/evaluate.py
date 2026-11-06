@@ -2,9 +2,12 @@
 
     python -m src.evaluate --run outputs/phase2/sim_v2
 
-Venom syndrome: accuracy, macro-F1, critical error rate (envenomed predicted as
-non-venomous/dry, the most important metric), NLL, ECE and Brier score.
+Venom syndrome: accuracy, macro-F1, weighted F1, per-class precision / recall (sensitivity) /
+F1 / specificity (one-vs-rest), envenomation sensitivity / specificity, critical error rate
+(envenomed predicted as non-venomous/dry, the most important metric) with its numerator,
+denominator and breakdown by true syndrome and by what was observed, NLL, ECE and Brier score.
 Species: accuracy, macro-F1, top-3 accuracy and NLL.
+Empty groups and classes absent from a split give NaN, never an exception.
 On simulated data every number is a SIMULATION result.
 """
 
@@ -15,7 +18,7 @@ import json
 from pathlib import Path
 
 import numpy as np
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, precision_recall_fscore_support
 
 from src.data.simulator import DRY_LABEL, SYNDROMES
 
@@ -56,13 +59,83 @@ def top_k_accuracy(proba: np.ndarray, y: np.ndarray, k: int) -> float:
     return float((top == y[:, None]).any(axis=1).mean())
 
 
+def _ratio(numerator: int, denominator: int) -> float:
+    return float(numerator / denominator) if denominator else float("nan")
+
+
+def per_class_metrics(y: np.ndarray, pred: np.ndarray, labels: tuple[str, ...] = SYNDROMES) -> dict[str, dict[str, float]]:
+    """One-vs-rest precision, recall (= sensitivity), F1, specificity and support per class.
+    A class with no true or no predicted members gets 0 for precision/recall/F1 (sklearn's
+    zero_division=0) and NaN specificity if there are no negatives."""
+    y, pred = np.asarray(y), np.asarray(pred)
+    k = len(labels)
+    precision, recall, f1, support = precision_recall_fscore_support(
+        y, pred, labels=list(range(k)), zero_division=0,
+    ) if len(y) else (np.full(k, np.nan),) * 3 + (np.zeros(k, dtype=int),)
+    out = {}
+    for c, label in enumerate(labels):
+        negatives = y != c
+        out[label] = {
+            "precision": float(precision[c]), "recall": float(recall[c]), "f1": float(f1[c]),
+            "sensitivity": float(recall[c]),
+            "specificity": _ratio(int((pred[negatives] != c).sum()), int(negatives.sum())),
+            "support": int(support[c]),
+        }
+    return out
+
+
+def envenomation_metrics(y: np.ndarray, pred: np.ndarray, dry_index: int = DRY_INDEX) -> dict[str, float]:
+    """Binary view envenomed (label != dry) vs not, at the predicted syndrome."""
+    y, pred = np.asarray(y), np.asarray(pred)
+    env, pred_env = y != dry_index, pred != dry_index
+    return {
+        "envenomation_sensitivity": _ratio(int((env & pred_env).sum()), int(env.sum())),
+        "envenomation_specificity": _ratio(int((~env & ~pred_env).sum()), int((~env).sum())),
+    }
+
+
+def critical_error_detail(y: np.ndarray, pred: np.ndarray, n_observed: np.ndarray | None = None,
+                          dry_index: int = DRY_INDEX) -> dict[str, object]:
+    """Critical error with numerator / denominator, by true syndrome and by observed-symptom group.
+    Definition unchanged: truly envenomed patients predicted non-venomous/dry."""
+    y, pred = np.asarray(y), np.asarray(pred)
+
+    def count(mask: np.ndarray) -> dict[str, float]:
+        env = mask & (y != dry_index)
+        missed = int((pred[env] == dry_index).sum())
+        return {"numerator": missed, "denominator": int(env.sum()), "rate": _ratio(missed, int(env.sum()))}
+
+    everyone = np.ones(len(y), dtype=bool)
+    out: dict[str, object] = {
+        **count(everyone),
+        "n_envenomed": int((y != dry_index).sum()),
+        "n_envenomed_predicted_dry": count(everyone)["numerator"],
+        "by_syndrome": {label: count(y == c) for c, label in enumerate(SYNDROMES) if c != dry_index},
+    }
+    if n_observed is not None:
+        n_observed = np.asarray(n_observed)
+        out["no_observed_symptom"] = count(n_observed == 0)
+        out["any_observed_symptom"] = count(n_observed > 0)
+    return out
+
+
 def syndrome_metrics(y: np.ndarray, pred: np.ndarray, proba: np.ndarray | None = None) -> dict[str, float]:
+    """Scalar syndrome metrics; existing keys keep their definitions, new keys are added."""
+    labels = list(range(len(SYNDROMES)))
+    if len(y) == 0:
+        nan = float("nan")
+        out = {"n": 0, "accuracy": nan, "macro_f1": nan, "critical_error_rate": nan, "weighted_f1": nan}
+        return out | ({"nll": nan, "ece": nan, "brier": nan} if proba is not None else {})
     out = {
         "n": int(len(y)),
         "accuracy": float(accuracy_score(y, pred)),
-        "macro_f1": float(f1_score(y, pred, labels=list(range(len(SYNDROMES))), average="macro", zero_division=0)),
+        "macro_f1": float(f1_score(y, pred, labels=labels, average="macro", zero_division=0)),
         "critical_error_rate": critical_error_rate(y, pred),
+        "weighted_f1": float(f1_score(y, pred, labels=labels, average="weighted", zero_division=0)),
+        **envenomation_metrics(y, pred),
     }
+    for label, values in per_class_metrics(y, pred).items():
+        out |= {f"{metric}_{label}": values[metric] for metric in ("precision", "recall", "f1", "specificity")}
     if proba is not None:
         out |= {
             "nll": negative_log_likelihood(proba, y),

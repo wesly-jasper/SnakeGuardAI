@@ -17,7 +17,7 @@ Labels are `venom_syndrome` (from the full course) and `species`.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -28,6 +28,7 @@ from src.data.simulator import SYNDROMES
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SPLITS: tuple[str, ...] = ("train", "calibration", "test")
 CONTEXT_FEATURES: tuple[str, ...] = ("hour_sin", "hour_cos", "hour_missing", "indoor", "asleep")
+PRESENTATION_TOLERANCE = 1e-9
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,7 @@ class SymptomDataset:
     symptoms: tuple[str, ...]       # symptom vocabulary (index = position)
     species: tuple[str, ...]        # species vocabulary
     meta: dict
+    markers: dict[str, str] = field(default_factory=dict)  # symptom -> marker (knowledge table, not a target)
 
     @property
     def syndrome_index(self) -> np.ndarray:
@@ -68,10 +70,18 @@ def observed_events(events: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_sequences(
-    events: pd.DataFrame, n_patients: int, symptoms: tuple[str, ...]
+    events: pd.DataFrame, n_patients: int, symptoms: tuple[str, ...], presentation: np.ndarray | None = None,
 ) -> list[np.ndarray]:
-    """Per patient, a (k, 2) float array of (symptom index, onset hours) sorted by onset."""
+    """Per patient, a (k, 2) float array of (symptom index, onset hours) sorted by onset.
+
+    With `presentation` (hours per patient), an event flagged observed but starting after
+    presentation is refused: the simulator's flag is re-checked, not trusted.
+    """
     seen = observed_events(events).copy()
+    if presentation is not None:
+        late = seen["hours"].to_numpy() > presentation[seen["patient_id"].to_numpy(dtype=int)] + PRESENTATION_TOLERANCE
+        if late.any():
+            raise ValueError(f"{int(late.sum())} event(s) flagged observed start after presentation")
     seen["index"] = encode(seen["symptom"], symptoms)
     seen = seen.sort_values(["patient_id", "hours", "index"], kind="stable")
     empty = np.zeros((0, 2), dtype=np.float64)
@@ -92,6 +102,11 @@ def vocabularies(knowledge_dir: Path) -> tuple[tuple[str, ...], tuple[str, ...]]
     return tuple(symptoms), tuple(species)
 
 
+def symptom_markers(knowledge_dir: Path) -> dict[str, str]:
+    table = pd.read_csv(knowledge_dir / "symptoms.csv")
+    return dict(zip(table["symptom"].astype(str), table["marker"].astype(str)))
+
+
 def load_dataset(directory: str | Path) -> SymptomDataset:
     """Load patients.csv, events.csv and meta.json written by `src.data.generate`."""
     directory = resolve(directory)
@@ -100,52 +115,27 @@ def load_dataset(directory: str | Path) -> SymptomDataset:
     events = pd.read_csv(directory / "events.csv")
     if not (patients["patient_id"].to_numpy() == np.arange(len(patients))).all():
         raise ValueError("patients.csv must have patient_id 0..n-1 in order")
-    symptoms, species = vocabularies(resolve(meta["config"].get("knowledge_dir", "knowledge")))
-    sequences = build_sequences(events, len(patients), symptoms)
-    return SymptomDataset(patients, sequences, symptoms, species, meta)
+    knowledge_dir = resolve(meta["config"].get("knowledge_dir", "knowledge"))
+    symptoms, species = vocabularies(knowledge_dir)
+    presentation = patients["presentation_hours"].to_numpy(dtype=float)
+    sequences = build_sequences(events, len(patients), symptoms, presentation)
+    return SymptomDataset(patients, sequences, symptoms, species, meta, symptom_markers(knowledge_dir))
 
 
 def context_features(patients: pd.DataFrame) -> np.ndarray:
-    """(n, 5) context features: cyclic hour of day (0 if unknown), hour-missing flag,
-    indoor and asleep (NaN if unknown; XGBoost handles missing values)."""
-    hours = pd.to_numeric(patients["hour_of_day"], errors="coerce").to_numpy(dtype=float)
-    missing = np.isnan(hours)
-    angle = 2 * np.pi * np.nan_to_num(hours) / 24.0
-    flags = [_flag(patients[c]) for c in ("indoor", "asleep")]
-    return np.column_stack([
-        np.where(missing, 0.0, np.sin(angle)), np.where(missing, 0.0, np.cos(angle)), missing.astype(float), *flags,
-    ])
+    """(n, 5) context features (see `src.data.features.context_matrix`)."""
+    from src.data.features import context_matrix, select_allowed
 
-
-def _flag(column: pd.Series) -> np.ndarray:
-    mapped = column.map({True: 1.0, False: 0.0, "True": 1.0, "False": 0.0})
-    return mapped.to_numpy(dtype=float)
+    return context_matrix(select_allowed(patients, ["hour_of_day", "indoor", "asleep"]))
 
 
 def tabular_features(ds: SymptomDataset, use_context: bool = False) -> tuple[np.ndarray, list[str]]:
-    """Fixed-width features for tree models, built from the observed events only.
+    """Fixed-width features for tree models, built through the input allowlist
+    (`src.data.features`): per symptom present / onset hours / hours since onset, presentation
+    hours, number of observed symptoms and, optionally, context."""
+    from src.data.features import FeatureSpec, build_inputs, tabular_matrix
 
-    Per symptom: present (0/1), onset hours and hours since onset (NaN if not observed).
-    Plus presentation hours, number of observed symptoms and, optionally, context.
-    """
-    n, k = len(ds.sequences), len(ds.symptoms)
-    present = np.zeros((n, k))
-    onset = np.full((n, k), np.nan)
-    for i, seq in enumerate(ds.sequences):
-        idx = seq[:, 0].astype(int)
-        present[i, idx] = 1.0
-        onset[i, idx] = seq[:, 1]
-    presentation = ds.patients["presentation_hours"].to_numpy(dtype=float)
-    since = presentation[:, None] - onset
-    columns = [present, onset, since, presentation[:, None], present.sum(axis=1, keepdims=True)]
-    names = (
-        [f"present_{s}" for s in ds.symptoms] + [f"onset_{s}" for s in ds.symptoms]
-        + [f"since_{s}" for s in ds.symptoms] + ["presentation_hours", "n_observed"]
-    )
-    if use_context:
-        columns.append(context_features(ds.patients))
-        names += list(CONTEXT_FEATURES)
-    return np.hstack(columns), names
+    return tabular_matrix(build_inputs(ds), FeatureSpec(context=use_context))
 
 
 def validation_split(train_mask: np.ndarray, fraction: float, seed: int) -> tuple[np.ndarray, np.ndarray]:

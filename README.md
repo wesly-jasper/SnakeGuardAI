@@ -99,16 +99,23 @@ every push and pull request.
 ## Phase 2: symptom-only baselines
 
 ```bash
-python -m src.train --config configs/phase2_sim_v2.yaml   # prior, rule, XGBoost, symptom transformer
-python -m src.evaluate --run outputs/phase2/sim_v2         # recompute metrics from saved predictions
+python -m src.train --config configs/phase2_sim_v2.yaml                  # all models, metrics, threshold tables
+python -m src.ablation --config configs/phase2_ablation_sim_v2.yaml      # input ablations A-I
+python -m src.robustness --config configs/phase2_robustness_sim_v2.yaml  # imperfect symptom reporting
+python -m src.evaluate --run outputs/phase2/sim_v2                       # recompute metrics from saved predictions
 ```
 
-`src/data/dataset.py` builds the model input from what is known at presentation: the
-observed symptoms (onset time, time since onset) and the presentation time. Label-only
-events and events after presentation never reach the model. Learned models train on the
-`train` split (minus a validation subset for early stopping) over 3 seeds; the `calibration`
-split is never fitted on, and its probabilities are saved for the Phase 6 conformal gate.
-`outputs/phase2/sim_v2/report.md` has the tables (SIMULATION results). See `docs/phase2_results.md`.
+Models: prior, rule-based table, XGBoost (with and without context), logistic regression,
+random forest and the symptom transformer, all through one registry (`src/models/registry.py`).
+Every model input passes a strict allowlist (`src/data/features.py`): observed symptoms with
+onset times, presentation time and, where asked for, hour of day / indoor / asleep. Targets,
+simulator diagnostics, placeholders and label-only or post-presentation events are refused,
+and `tests/test_leakage.py` checks this by perturbing them and requiring identical inputs.
+Learned models train on the `train` split (minus a validation subset for early stopping) over
+3 seeds; the `calibration` split is never fitted on. `src/decision_policy.py` lists
+research-only threshold tables for P(envenomed); they are **not** clinical thresholds.
+Reports go to `outputs/phase2/<run>/report.md` (SIMULATION results). See
+`docs/phase2_results.md` and the audit in `docs/phase2_audit.md`.
 
 ## Status
 
