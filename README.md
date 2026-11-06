@@ -15,7 +15,8 @@ See `CLAUDE.md` for the full research design.
 ```bash
 py -3.11 -m venv .venv
 .venv/Scripts/python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
-.venv/Scripts/python -m pip install -r requirements.txt
+.venv/Scripts/python -m pip install -r requirements-dev.txt   # runtime + pyflakes, matplotlib
+.venv/Scripts/python -m pyflakes src tests
 .venv/Scripts/python -m pytest
 ```
 
@@ -99,10 +100,13 @@ every push and pull request.
 ## Phase 2: symptom-only baselines
 
 ```bash
-python -m src.train --config configs/phase2_sim_v2.yaml                  # all models, metrics, threshold tables
+python -m src.train --config configs/phase2_sim_v2.yaml                  # all models, calibration, threshold tables
 python -m src.ablation --config configs/phase2_ablation_sim_v2.yaml      # input ablations A-I
 python -m src.robustness --config configs/phase2_robustness_sim_v2.yaml  # imperfect symptom reporting
+python -m src.explain --config configs/phase2_explain_sim_v2.yaml        # XGBoost / RF explanations
+python -m src.seed_variability --config configs/phase2_simseed_sim_v2.yaml  # 5 simulator seeds x 3 model seeds
 python -m src.evaluate --run outputs/phase2/sim_v2                       # recompute metrics from saved predictions
+python -m src.verify_runs outputs/phase2/sim_v2                          # split, leakage and regeneration checks
 ```
 
 Models: prior, rule-based table, XGBoost (with and without context), logistic regression,
@@ -112,17 +116,27 @@ onset times, presentation time and, where asked for, hour of day / indoor / asle
 simulator diagnostics, placeholders and label-only or post-presentation events are refused,
 and `tests/test_leakage.py` checks this by perturbing them and requiring identical inputs.
 Learned models train on the `train` split (minus a validation subset for early stopping) over
-3 seeds; the `calibration` split is never fitted on. `src/decision_policy.py` lists
-research-only threshold tables for P(envenomed); they are **not** clinical thresholds.
-Reports go to `outputs/phase2/<run>/report.md` (SIMULATION results). See
-`docs/phase2_results.md` and the audit in `docs/phase2_audit.md`.
+3 model seeds. The `calibration` split is never used to fit or select models; it only fits the
+post-hoc calibrators (temperature, Platt, isotonic; `src/uncertainty/calibration.py`), which are
+evaluated on test next to the raw probabilities. `src/decision_policy.py` lists research-only
+threshold tables for P(envenomed); they are **not** clinical thresholds.
+
+Every run writes `run.json` (status, deterministic run id, git commit and dirty flag, simulator
+and model seeds, dataset and knowledge hashes, feature allowlist and input columns, split
+distributions, package versions) and `attempts.jsonl` (failures included), and refuses to overwrite
+a completed run without `--overwrite` (`src/artifacts.py`). Splits are random by default;
+`split_strategy: stratified` in a dataset config stratifies by species and syndrome with a logged
+fallback for rare strata (`src/data/splits.py`). Reports go to `outputs/phase2/<run>/report.md`
+(SIMULATION results). See `docs/phase2_results.md`, the audit in `docs/phase2_audit.md` and the
+evidence audit of the label-only local signs in `docs/evidence_audit_local_signs.md`.
 
 ## Status
 
 - [x] Phase 0: repo, environment, tests
 - [x] Phase 1: clinical knowledge table + simulator (engineering done; rows await human verification,
       see docs/verification_checklist.md). GPS and month are uniform placeholders until Phase 3.
-- [x] Phase 2: symptom-only baselines (prior, rule, XGBoost, symptom transformer; see docs/phase2_results.md)
+- [x] Phase 2: symptom-only baselines, software-validated and simulation-evaluated only (see
+      docs/phase2_results.md); not clinically validated. Early local-sign onsets remain an evidence gap.
 - [ ] Phase 3: geographic prior (GBIF)
 - [ ] Phase 4: image branch (SnakeCLEF)
 - [ ] Phase 5: missing-modality fusion

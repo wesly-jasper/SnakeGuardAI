@@ -1,4 +1,5 @@
-# Runs the test suite and validates the knowledge-base schema and citations.
+# Lints, validates the knowledge base (schema, citations) and runs the test suite, including small
+# end-to-end runs of training, calibration, explanations and simulator-seed variability.
 name: tests
 
 on:
@@ -14,11 +15,13 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install dependencies
+      - name: Install dependencies (CPU torch, then runtime + dev requirements)
         run: |
           python -m pip install --upgrade pip
           python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
-          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-dev.txt
+      - name: Lint (pyflakes)
+        run: python -m pyflakes src tests
       - name: Validate knowledge base (schema, citations, onset orders, delay bins)
         run: python -m src.data.validate
       - name: Run tests

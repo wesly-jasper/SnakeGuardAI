@@ -1,0 +1,39 @@
+# Phase 2 simulator-seed variability (src/seed_variability.py). SIMULATION results only.
+#   python -m src.seed_variability --config configs/phase2_simseed_sim_v2.yaml
+# configs/sim_v2.yaml is regenerated with only the seed changed (42 reproduces sim_v2 itself);
+# the same model seeds are trained on every dataset. Simulator seeds and model seeds are kept apart.
+name: phase2_simseed_sim_v2
+base_config: configs/sim_v2.yaml
+simulator_seeds: [42, 43, 44, 45, 46]
+model_seeds: [0, 1, 2]
+data_dir: data/processed/simseed_sim_v2
+output_dir: outputs/phase2/simseed_sim_v2
+validation_fraction: 0.15
+torch_threads: 4
+bootstrap: 200              # test-set bootstrap resamples (evaluation uncertainty)
+decision_thresholds: [0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5]
+calibration: {methods: [temperature, sigmoid, isotonic], min_isotonic_n: 1000, min_isotonic_class: 50}
+models:
+  prior: {}
+  rule: {}
+  xgboost:
+    params: {n_estimators: 600, max_depth: 4, learning_rate: 0.05, subsample: 0.9,
+             colsample_bytree: 0.9, early_stopping_rounds: 30}
+  xgboost_context:
+    params: {n_estimators: 600, max_depth: 4, learning_rate: 0.05, subsample: 0.9,
+             colsample_bytree: 0.9, early_stopping_rounds: 30}
+  logistic_regression:        # fixed hyperparameters, nothing tuned
+    params: {C: 1.0, max_iter: 2000, class_weight: null}
+  random_forest:
+    params: {n_estimators: 300, max_depth: null, min_samples_leaf: 5, class_weight: null}
+  transformer:
+    d_model: 64
+    n_heads: 4
+    n_layers: 2
+    dropout: 0.1
+    lr: 0.001
+    weight_decay: 0.01
+    batch_size: 256
+    max_epochs: 60
+    patience: 8
+    species_loss_weight: 1.0

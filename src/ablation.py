@@ -33,10 +33,11 @@ import pandas as pd
 import torch
 import yaml
 
+from src.artifacts import RunRecorder, base_info
 from src.data.dataset import load_dataset, resolve
 from src.data.features import FeatureSpec, build_inputs
-from src.data.generate import git_commit
 from src.data.simulator import SYNDROMES
+from src.data.splits import split_summary
 from src.decision_policy import DEFAULT_THRESHOLDS, validate_thresholds
 from src.models.registry import resolve_model
 from src.reporting import HEADER, RESEARCH_ONLY, fmt
@@ -86,14 +87,21 @@ def expand_experiments(config: dict[str, Any], observed_symptoms: list[str]) -> 
     return experiments
 
 
-def run(config: dict[str, Any]) -> Path:
+def run(config: dict[str, Any], overwrite: bool = False) -> Path:
     ds = load_dataset(config["dataset"])
+    out = resolve(config["output_dir"])
+    info = base_info(config, resolve(config["dataset"]), ds.meta) | {"splits": split_summary(ds.patients)}
+    with RunRecorder(out, info, overwrite or bool(config.get("overwrite", False))) as recorder:
+        _run(config, ds, out, recorder.info)
+    return out
+
+
+def _run(config: dict[str, Any], ds: Any, out: Path, run_info: dict[str, Any]) -> None:
     inputs = build_inputs(ds)
     n_observed = inputs.n_observed
     test = ds.split_mask("test")
     thresholds = validate_thresholds(config.get("decision_thresholds", DEFAULT_THRESHOLDS))
     torch.set_num_threads(int(config.get("torch_threads", 4)))
-    out = resolve(config["output_dir"])
     (out / "experiments").mkdir(parents=True, exist_ok=True)
     counts = np.bincount(np.concatenate([s[:, 0].astype(int) for s in inputs.sequences] or [np.zeros(0, int)]),
                          minlength=len(inputs.symptoms))
@@ -119,16 +127,10 @@ def run(config: dict[str, Any]) -> Path:
         (exp_dir / "metrics.json").write_text(json.dumps(entry, indent=2), encoding="utf-8")
         s = entry["summary"]["syndrome"]
         print(f"{name}: macro-F1 {s['macro_f1']['mean']:.3f}, critical error {s['critical_error_rate']['mean']:.3f}")
-    run_info = {
-        "SIMULATED": bool(ds.meta.get("SIMULATED", False)), "config": config, "git_commit": git_commit(),
-        "dataset_git_commit": ds.meta.get("git_commit"), "dataset_experiment_type": ds.meta.get("experiment_type"),
-        "symptoms_never_observed_in_inputs": never,
-    }
-    (out / "run.json").write_text(json.dumps(run_info, indent=2, default=str), encoding="utf-8")
+    run_info["symptoms_never_observed_in_inputs"] = never
     (out / "ablation.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     (out / "report.md").write_text(render(results, run_info, int(test.sum()), int((n_observed[test] == 0).sum())),
                                    encoding="utf-8")
-    return out
 
 
 def row(name: str, entry: dict[str, Any], base: dict[str, Any] | None) -> dict[str, Any]:
@@ -182,8 +184,9 @@ def render(results: dict[str, Any], run_info: dict[str, Any], n_test: int, n_no_
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--config", required=True)
+    parser.add_argument("--overwrite", action="store_true", help="replace a completed run in output_dir")
     args = parser.parse_args(argv)
-    print(f"wrote results to {run(load_config(args.config))}")
+    print(f"wrote results to {run(load_config(args.config), overwrite=args.overwrite)}")
 
 
 if __name__ == "__main__":

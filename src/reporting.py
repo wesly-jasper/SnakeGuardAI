@@ -84,8 +84,37 @@ def policy_rows(results: dict[str, Any], group: str) -> list[dict[str, Any]]:
     return rows
 
 
+def split_rows(splits: dict[str, Any]) -> list[dict[str, Any]]:
+    """One row per split: size, envenomed share, syndrome shares and the species share range."""
+    rows = []
+    for name, s in splits.get("splits", {}).items():
+        row = {"split": name, "n": s["n"], "envenomed": f"{s['envenomed']['share']:.3f}"}
+        row |= {label: f"{v['share']:.3f}" for label, v in s["syndrome"].items()}
+        shares = [v["share"] for v in s["species"].values()]
+        row["species share (min-max)"] = f"{min(shares):.3f}-{max(shares):.3f}" if shares else "-"
+        rows.append(row)
+    return rows
+
+
+def calibration_rows(results: dict[str, Any], target: str) -> list[dict[str, Any]]:
+    """Raw vs calibrated NLL / Brier / ECE per model and method (`target`: syndrome or envenomed)."""
+    rows = []
+    for name, res in results.items():
+        cal = res["summary"].get("calibration")
+        if not cal:
+            continue
+        for method, m in cal[target].items():
+            helped = "-" if method == "raw" else f"{m['helps_nll_seeds']}/{len(res['runs'])}"
+            rows.append({"model": name, "method": method, "nll": fmt(m["nll"], 4), "brier": fmt(m["brier"], 4),
+                         "ece": fmt(m["ece"], 4), "lower NLL than raw (seeds)": helped})
+    return rows
+
+
 def render_train_report(results: dict[str, Any], n_test: int, n_no_obs: int, run_info: dict[str, Any]) -> str:
     config = run_info["config"]
+    splits = run_info.get("splits", {})
+    skipped = next((r["summary"]["calibration"]["skipped"] for r in results.values()
+                    if "calibration" in r["summary"]), {})
     species_rows, strat_rows, feature_rows, confusions = [], [], [], []
     for name, res in results.items():
         s = res["summary"]
@@ -106,12 +135,13 @@ def render_train_report(results: dict[str, Any], n_test: int, n_no_obs: int, run
         f"# Phase 2: symptom-only baselines on `{config['dataset']}`\n",
         HEADER if run_info["SIMULATED"] else "",
         RESEARCH_ONLY,
-        f"- run `{config['name']}`, commit `{run_info['git_commit']}`; dataset `{run_info['dataset']}` "
+        f"- run `{config['name']}` (id `{run_info.get('run_id', '-')}`), commit `{run_info['git_commit']}`; "
+        f"dataset `{run_info['dataset']}` "
         f"({run_info['dataset_experiment_type']}, generated at `{run_info['dataset_git_commit']}`)",
         f"- test split: {n_test} patients, {n_no_obs} ({n_no_obs / max(1, n_test):.0%}) with no symptom observed by presentation",
         f"- learned models: train split minus a {config.get('validation_fraction', 0.15):.0%} validation subset "
         f"(early stopping); seeds {config['seeds']}; mean ± sd over training seeds (one simulated dataset). "
-        "The calibration split is not used. Hyperparameters are fixed in the config; none is tuned.",
+        "The calibration split is never used to fit or select models; it only fits the post-hoc calibrators below. Hyperparameters are fixed in the config; none is tuned.",
         "- inputs pass the allowlist in `src/data/features.py` (observed symptoms, onset times, presentation time, "
         "optional hour/indoor/asleep). GPS and month are placeholders and never used.",
         "\n## Venom syndrome (test split)\n",
@@ -134,6 +164,19 @@ def render_train_report(results: dict[str, Any], n_test: int, n_no_obs: int, run
         table(policy_rows(results, "all")),
         "\n## Experimental threshold policy, patients with no observed symptom (test split)\n",
         table(policy_rows(results, "no_observed_symptom")),
+        "\n## Post-hoc calibration (fitted on the calibration split, evaluated on test)\n",
+        "Raw probabilities are the model outputs used everywhere above; calibrated ones are additional outputs "
+        f"saved next to them (`p_syndrome_<method>`, `p_envenomed_<method>`). Skipped methods: {skipped or 'none'}.\n",
+        "### Venom syndrome (multiclass)\n",
+        table(calibration_rows(results, "syndrome")),
+        "\n### P(envenomed) (binary)\n",
+        table(calibration_rows(results, "envenomed")),
+        "\nA method that does not lower test NLL did not help; that is reported here, not hidden.",
+        "\n## Splits (patient level; every patient is in exactly one split)\n",
+        f"Assignment: `{run_info.get('split_assignment', {}).get('strategy', 'random')}`. Held-out patients whose "
+        f"inputs are identical to some training patient's: {splits.get('identical_inputs_to_train', 'n/a')} "
+        "(independent simulated patients; identical inputs arise when nothing distinguishing is observed).\n",
+        table(split_rows(splits)),
         "\n## Model inputs (validated against the allowlist)\n",
         table(feature_rows),
         "\n## Syndrome confusion matrices (test split)\n",

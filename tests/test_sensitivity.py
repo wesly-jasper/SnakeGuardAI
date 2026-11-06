@@ -52,7 +52,7 @@ def test_variant_config_and_summary(knowledge_dir: Path, tmp_path: Path) -> None
 def test_multi_seed_run_and_intervals(knowledge_dir: Path, tmp_path: Path) -> None:
     import yaml
 
-    from src.data.sensitivity import aggregate, render, run, t_interval
+    from src.data.sensitivity import aggregate, render, run
 
     base = {"name": "b", "seed": 3, "n_patients": 200, "knowledge_dir": str(knowledge_dir),
             "output_dir": "unused"}

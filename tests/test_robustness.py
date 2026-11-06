@@ -125,6 +125,10 @@ def test_robustness_cli(sim: Path, tmp_path: Path) -> None:
     clean = {k: s[k]["0.0"]["macro_f1"]["mean"] for k in s}
     assert len(set(clean.values())) == 1
     assert "SIMULATION RESULTS" in (tmp_path / "rob" / "report.md").read_text(encoding="utf-8")
+    info = json.loads((tmp_path / "rob" / "run.json").read_text())
+    assert info["status"] == "complete" and info["splits"]["n_total"] == 500 and info["levels"] == [0.0, 0.3]
+    with pytest.raises(FileExistsError):
+        run(config)
 
 
 def test_ablation_cli(sim: Path, tmp_path: Path) -> None:
@@ -162,3 +166,5 @@ def test_ablation_cli(sim: Path, tmp_path: Path) -> None:
     assert "presentation_hours" not in res["D_no_presentation"]["features"]
     report = (out / "report.md").read_text(encoding="utf-8")
     assert "not causal clinical evidence" in report and "SIMULATION RESULTS" in report
+    info = json.loads((out / "run.json").read_text())
+    assert info["status"] == "complete" and info["symptoms_never_observed_in_inputs"] is not None

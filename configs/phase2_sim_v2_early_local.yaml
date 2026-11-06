@@ -11,6 +11,9 @@ torch_threads: 4
 # Research-only threshold table for P(envenomed) on the test split; listed, never selected.
 # Not clinically validated thresholds (src/decision_policy.py).
 decision_thresholds: [0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5]
+# Post-hoc calibration (src/uncertainty/calibration.py): fitted on the calibration split only,
+# evaluated on test; raw probabilities are kept. Isotonic only when the calibration split is large enough.
+calibration: {methods: [temperature, sigmoid, isotonic], min_isotonic_n: 1000, min_isotonic_class: 50}
 models:
   prior: {}
   rule: {}

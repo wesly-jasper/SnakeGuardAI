@@ -178,6 +178,17 @@ def evaluate_predictions(path: Path) -> dict[str, object]:
     if "p_species" in data:
         out["species"] = species_metrics(y_sp, data["p_species"][test])
     out["stratified"] = stratified_syndrome(y_syn, pred, data["n_observed"][test])
+    calibrated = sorted(k[len("p_syndrome_"):] for k in data.files if k.startswith("p_syndrome_"))
+    if calibrated:
+        from src.uncertainty.calibration import binary_metrics, envenomed_labels, multiclass_metrics
+
+        y_env = envenomed_labels(y_syn)
+        out["calibration"] = {
+            "syndrome": {"raw": multiclass_metrics(np.asarray(p_syn, dtype=float), y_syn)}
+            | {m: multiclass_metrics(data[f"p_syndrome_{m}"][test], y_syn) for m in calibrated},
+            "envenomed": {"raw": binary_metrics(data["p_envenomed_raw"][test], y_env)}
+            | {m: binary_metrics(data[f"p_envenomed_{m}"][test], y_env) for m in calibrated},
+        }
     return out
 
 

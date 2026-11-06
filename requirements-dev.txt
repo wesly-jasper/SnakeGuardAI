@@ -1,0 +1,5 @@
+# Development and CI extras on top of requirements.txt.
+#   python -m pip install -r requirements-dev.txt
+-r requirements.txt
+pyflakes>=3.2
+matplotlib>=3.8   # reliability diagrams and explanation plots (optional at runtime)

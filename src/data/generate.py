@@ -59,6 +59,7 @@ from src.data.simulator import (
     simulate_patients,
     to_dataframe,
 )
+from src.data.splits import STRATEGIES, assign_splits_stratified, split_summary
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SPLITS = {"train": 0.6, "calibration": 0.2, "test": 0.2}
@@ -183,6 +184,20 @@ def assumptions(
     return items
 
 
+def make_splits(table: Any, config: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
+    """Split labels per `split_strategy`: `random` (default, unchanged) or `stratified`."""
+    fractions = config.get("splits", DEFAULT_SPLITS)
+    strategy = config.get("split_strategy", "random")
+    if strategy not in STRATEGIES:
+        raise ValueError(f"split_strategy must be one of {STRATEGIES}")
+    if strategy == "random":
+        return assign_splits(len(table), fractions, int(config["seed"])), {"strategy": "random"}
+    return assign_splits_stratified(
+        table["species"].tolist(), table["venom_syndrome"].tolist(), fractions, int(config["seed"]),
+        int(config.get("split_min_stratum", 20)),
+    )
+
+
 def generate(config: dict[str, Any]) -> Path:
     """Simulate patients per `config` and write the dataset; returns the output dir."""
     knowledge_dir = resolve(config.get("knowledge_dir", "knowledge"))
@@ -215,7 +230,7 @@ def generate(config: dict[str, Any]) -> Path:
         unknown_onset=sim_mode,
     )
     table = to_dataframe(patients)
-    table["split"] = assign_splits(len(patients), config.get("splits", DEFAULT_SPLITS), int(config["seed"]))
+    table["split"], split_info = make_splits(table, config)
 
     out = resolve(config["output_dir"])
     out.mkdir(parents=True, exist_ok=True)
@@ -266,6 +281,8 @@ def generate(config: dict[str, Any]) -> Path:
             table["presentation_hours"].describe(percentiles=[0.25, 0.5, 0.75]).round(2).to_dict()
             if len(table) else {}
         ),
+        "split_assignment": split_info,
+        "split_summary": split_summary(table) if len(table) else {},
         "syndrome_counts": table["venom_syndrome"].value_counts().to_dict() if len(table) else {},
         "rule_baseline_test": baseline,
     }

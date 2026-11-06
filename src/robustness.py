@@ -39,9 +39,10 @@ import pandas as pd
 import torch
 import yaml
 
+from src.artifacts import RunRecorder, base_info
 from src.data.dataset import load_dataset, resolve
 from src.data.features import ModelInputs, build_inputs
-from src.data.generate import git_commit
+from src.data.splits import split_summary
 from src.decision_policy import DEFAULT_THRESHOLDS, validate_thresholds
 from src.models.registry import resolve_model
 from src.reporting import HEADER, RESEARCH_ONLY, fmt
@@ -150,8 +151,16 @@ def load_config(path: str | Path) -> dict[str, Any]:
     return config
 
 
-def run(config: dict[str, Any]) -> Path:
+def run(config: dict[str, Any], overwrite: bool = False) -> Path:
     ds = load_dataset(config["dataset"])
+    out = resolve(config["output_dir"])
+    info = base_info(config, resolve(config["dataset"]), ds.meta) | {"splits": split_summary(ds.patients)}
+    with RunRecorder(out, info, overwrite or bool(config.get("overwrite", False))) as recorder:
+        _run(config, ds, out, recorder.info)
+    return out
+
+
+def _run(config: dict[str, Any], ds: Any, out: Path, run_info: dict[str, Any]) -> None:
     clean = build_inputs(ds)
     n_observed = clean.n_observed
     test = ds.split_mask("test")
@@ -187,15 +196,9 @@ def run(config: dict[str, Any]) -> Path:
                     cells[kind][str(level)].append({"seed": seed, "supported": True, "metrics": metrics})
             print(f"{name} seed {seed}: done")
         results[name] = {"kind": spec.kind, "cells": cells, "summary": summarise_cells(cells)}
-    run_info = {"SIMULATED": bool(ds.meta.get("SIMULATED", False)), "config": config, "git_commit": git_commit(),
-                "dataset_git_commit": ds.meta.get("git_commit"), "levels": levels,
-                "clean_visible_events_test": int(n_observed[test].sum())}
-    out = resolve(config["output_dir"])
-    out.mkdir(parents=True, exist_ok=True)
-    (out / "run.json").write_text(json.dumps(run_info, indent=2, default=str), encoding="utf-8")
+    run_info |= {"levels": levels, "clean_visible_events_test": int(n_observed[test].sum())}
     (out / "robustness.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     (out / "report.md").write_text(render(results, run_info, selected), encoding="utf-8")
-    return out
 
 
 def summarise_cells(cells: dict[str, dict[str, list[dict[str, Any]]]]) -> dict[str, Any]:
@@ -250,8 +253,9 @@ def render(results: dict[str, Any], run_info: dict[str, Any], selected: list[str
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--config", required=True)
+    parser.add_argument("--overwrite", action="store_true", help="replace a completed run in output_dir")
     args = parser.parse_args(argv)
-    print(f"wrote results to {run(load_config(args.config))}")
+    print(f"wrote results to {run(load_config(args.config), overwrite=args.overwrite)}")
 
 
 if __name__ == "__main__":
