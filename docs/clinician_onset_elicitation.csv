@@ -1,0 +1,10 @@
+tier,species,sign,typical_onset_min,earliest_min,latest_min,confidence_1_to_5,region_and_setting,n_patients_seen_roughly,comments
+1,Daboia russelii,local_pain,,,,,,,
+1,Daboia russelii,local_swelling,,,,,,,
+1,Naja naja,local_swelling,,,,,,,
+1,Echis carinatus,local_pain,,,,,,,
+2,Naja naja,local_necrosis,,,,,,,
+2,Echis carinatus,systemic_bleeding,,,,,,,
+2,Hypnale hypnale,blistering,,,,,,,
+2,Hypnale hypnale,regional_lymphadenopathy,,,,,,,
+2,Bungarus caeruleus,abdominal_pain,,,,,,,

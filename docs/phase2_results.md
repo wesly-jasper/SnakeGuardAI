@@ -158,6 +158,12 @@ outputs is in the "Reproduction" section below.
 | simulator seeds | sim_v2 regenerated with seeds 42-46, 3 model seeds each | `configs/phase2_simseed_sim_v2.yaml` | `outputs/phase2/simseed_sim_v2` |
 | explanations | XGBoost (with and without context), random forest; model seed 0 | sim_v2 / `configs/phase2_explain_sim_v2.yaml` | `outputs/phase2/explain_sim_v2` |
 | ablations / robustness | as in the hardening section (re-run, identical numbers) | sim_v2 | `outputs/phase2/ablation_sim_v2`, `robustness_sim_v2` |
+| sensitivity: cited viper swelling window | Russell's viper local swelling given the cited general-viper window [0.25, 2] h (mehta2002clinical, secondary) | `sim_v2_viper_swelling` / `configs/phase2_sim_v2_viper_swelling.yaml` (no transformer) | `outputs/phase2/sim_v2_viper_swelling` |
+
+The cited-alternative run (added after the clean-commit reproduction) lowers XGBoost critical error
+from 0.347 to 0.294 and raises macro-F1 from 0.654 to 0.693. The other models move the same way.
+Details are in docs/evidence_audit_local_signs.md. It is a sensitivity analysis; the primary
+sim_v2 is unchanged.
 
 ### Simulator-seed variability (5 simulated datasets x 3 model seeds)
 

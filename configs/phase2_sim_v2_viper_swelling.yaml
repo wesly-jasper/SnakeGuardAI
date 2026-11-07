@@ -1,0 +1,30 @@
+# Phase 2 cited-alternative sensitivity: Russell's viper local swelling given the cited general-viper
+# window [0.25, 2] h (configs/sim_v2_viper_swelling.yaml). Transformer omitted (slow; tabular models suffice).
+# All results are SIMULATION results.
+#   python -m src.data.generate --config configs/sim_v2_viper_swelling.yaml
+#   python -m src.train --config configs/phase2_sim_v2_viper_swelling.yaml
+name: phase2_sim_v2_viper_swelling
+dataset: data/processed/sim_v2_viper_swelling
+output_dir: outputs/phase2/sim_v2_viper_swelling
+seeds: [0, 1, 2]
+validation_fraction: 0.15   # carved out of the train split for early stopping
+torch_threads: 4
+# Research-only threshold table for P(envenomed) on the test split; listed, never selected.
+# Not clinically validated thresholds (src/decision_policy.py).
+decision_thresholds: [0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5]
+# Post-hoc calibration (src/uncertainty/calibration.py): fitted on the calibration split only,
+# evaluated on test; raw probabilities are kept. Isotonic only when the calibration split is large enough.
+calibration: {methods: [temperature, sigmoid, isotonic], min_isotonic_n: 1000, min_isotonic_class: 50}
+models:
+  prior: {}
+  rule: {}
+  xgboost:
+    params: {n_estimators: 600, max_depth: 4, learning_rate: 0.05, subsample: 0.9,
+             colsample_bytree: 0.9, early_stopping_rounds: 30}
+  xgboost_context:
+    params: {n_estimators: 600, max_depth: 4, learning_rate: 0.05, subsample: 0.9,
+             colsample_bytree: 0.9, early_stopping_rounds: 30}
+  logistic_regression:        # fixed hyperparameters, nothing tuned
+    params: {C: 1.0, max_iter: 2000, class_weight: null}
+  random_forest:
+    params: {n_estimators: 300, max_depth: null, min_samples_leaf: 5, class_weight: null}

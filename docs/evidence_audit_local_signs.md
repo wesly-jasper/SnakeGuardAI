@@ -25,6 +25,38 @@ snippets (source not identified, not used); North American pit viper and Hong Ko
 statements (wrong species or region, not used). WHO 2016 and MoHFW 2017 give only qualitative
 or treatment-criterion statements ("within 48 h", "rapid extension"), not onset windows.
 
+## Third search (2026-11-07): one cited general statement
+
+knowledge/extraction/onsets_vipers.md section 5. Still no species-specific case series with a
+measured time to local swelling or pain. One citable **secondary** statement was found for vipers in
+general: mehta2002clinical (Med J Armed Forces India 2002, citing Warrell, Oxford Textbook of
+Medicine 1996): "Swelling may become apparent within 15 minutes", and "If there is no swelling 2
+hours after a viper bite, it is safe to assume that there has been no envenoming". This gives a
+[0.25, 2] h window for **Russell's viper local swelling** only. Saw-scaled viper swelling already has a
+cited window. Pain is described as "immediately" with no upper bound. A cobra figure
+caption (Bawaskar 2004, n=1) is not an onset.
+
+Used as a **cited-alternative sensitivity** (`configs/sim_v2_viper_swelling.yaml`), not in the primary
+table. That is because the statement is secondary, not species-specific, and the 2 h bound is a rule of thumb.
+Effect (test split, 3 model seeds; SIMULATION):
+
+| model | sim_v2 macro-F1 / critical error | with cited Russell's viper swelling window |
+|---|---|---|
+| rule | 0.571 / 0.347 | 0.579 / 0.295 |
+| xgboost | 0.654 / 0.347 | 0.693 / 0.294 |
+| xgboost_context | 0.689 / 0.248 | 0.718 / 0.196 |
+| logistic_regression | 0.644 / 0.347 | 0.688 / 0.295 |
+| random_forest | 0.651 / 0.339 | 0.688 / 0.292 |
+
+Envenomed Russell's viper patients with nothing observable at presentation fall from 40% to 17.5%.
+So the cited evidence alone moves critical error to about 0.29. The fully assumed window for all four
+rows (`sim_v2_early_local`) gives about 0.12.
+
+**Decision (2026-11-07, project lead): keep as sensitivity only.** The secondary window is not
+adopted in the primary table, and sim_v2 stays the primary dataset. Revisit if a species-specific
+source is found. A clinician estimate (docs/clinician_priority_review.md) or cohort data
+(docs/outreach_drafts.md) would settle it better.
+
 ## How the rows are used (observed vs label-only)
 
 - In the primary dataset (`sim_v2`, `unknown_onset: label_only`) these symptoms occur at the cited
@@ -59,5 +91,6 @@ Measured on `sim_v2` (all splits, SIMULATION):
 1. Clinician verification of all four rows (`verified=False`), with priority on Naja local_swelling
    (abstract-only source, mapped term).
 2. Real time-to-local-sign data: a clinician co-author, the Silva/Isbister cohort authors, Phillips
-   1988 QJM or Warrell 2010 Lancet (library access).
+   1988 QJM or Warrell 2010 Lancet (library access). Review form: docs/clinician_priority_review.md and
+   docs/clinician_onset_elicitation.csv; email drafts: docs/outreach_drafts.md.
 3. Indian cohorts with per-sign counts (all four rows currently rest on Sri Lankan series).

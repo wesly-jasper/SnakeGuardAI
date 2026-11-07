@@ -1,0 +1,36 @@
+# SENSITIVITY dataset (basis: cited-alternative): sim_v2 plus a CITED general-viper onset window for
+# Russell's viper local swelling only. mehta2002clinical (Med J Armed Forces India 2002, narrative
+# review citing Warrell, Oxford Textbook of Medicine 1996): "Swelling may become apparent within 15
+# minutes" and "If there is no swelling 2 hours after a viper bite, it is safe to assume that there
+# has been no envenoming" -> window [0.25, 2.0] h. Secondary, not species-specific, and the 2 h bound is
+# a clinical rule of thumb (knowledge/extraction/onsets_vipers.md section 5). Russell's viper local pain,
+# cobra local swelling and saw-scaled viper local pain have no citable onset and stay label-only.
+# Not adopted in the primary sim_v2. Output is SIMULATION data.
+name: sim_v2_viper_swelling
+experiment_type: sensitivity
+seed: 42
+n_patients: 20000
+knowledge_dir: knowledge
+output_dir: data/processed/sim_v2_viper_swelling
+# Bite-to-presentation delay: cited bins from knowledge/presentation_delay.csv.
+# kerala_adult = sajeethkumar2018clinical (n=1,500, North Kerala). The '> 24 h' bin has no
+# reported upper bound; open_bin_max_hours is an assumption (varied in sensitivity_v2).
+presentation_delay:
+  profile: kerala_adult
+  open_bin_max_hours: 48
+species_weights: null          # uniform until a cited epidemiological mix is chosen
+syndrome_precedence: [haemotoxic, neurotoxic]
+# Shared latent severity (Gaussian copula). Modelling assumption with no cited value yet:
+# 0 = independent symptoms. Varied 0-0.8 in configs/sensitivity_v2.yaml.
+severity_correlation: 0.5
+unknown_onset: label_only      # exclude | label_only (fallback only in sensitivity configs)
+onset_fallback: null           # unknown onsets are never filled in the primary dataset
+max_order_tries: 100           # redraws for onset orders the push alone cannot satisfy
+diagnostics_n_per_species: 2000
+splits: {train: 0.6, calibration: 0.2, test: 0.2}
+require_citations: false       # set true once knowledge/ is fully filled
+require_verified: false        # set true once every row is human-checked
+knowledge_overrides:            # CITED ALTERNATIVE (secondary, general viper statement; see header)
+  - {table: clinical, match: {species: Daboia russelii, symptom: local_swelling},
+     set: {onset_min_hours: 0.25, onset_max_hours: 2.0,
+           source_key: kularatne2014revisiting; mehta2002clinical}}

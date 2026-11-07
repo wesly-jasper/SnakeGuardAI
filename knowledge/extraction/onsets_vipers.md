@@ -197,3 +197,20 @@ A sensitivity dataset with an ASSUMED [0, 1.5] h window for these rows (by analo
 Echis swelling and Hypnale local-sign windows) is configs/sim_v2_early_local.yaml.
 Best next step: ask a clinician co-author or the Silva/Isbister cohort authors for time-to-local-sign
 data, or read Phillips 1988 QJM / Warrell 2010 Lancet in a library.
+
+## 5. Third search for early local-sign onsets (2026-11-07)
+
+Searched again for a since-bite onset of local pain / swelling for Daboia russelii, Naja naja and
+Echis carinatus (web search; cached full texts re-grepped). **Still no case series with a measured
+time to local swelling or pain for these species.** One citable general statement was found:
+
+| species | symptom | onset_min_h | onset_max_h | onset_basis | source_key | locator | verbatim quote | notes |
+|---|---|---|---|---|---|---|---|---|
+| vipers (general) | local_swelling | 0.25 | 2.0 | secondary review (textbook) | mehta2002clinical | "Local swelling" paragraph | "Swelling may become apparent within 15 minutes and becomes massive in 2-3 days." ... "If there is no swelling 2 hours after a viper bite, it is safe to assume that there has been no envenoming [3]." | [3] = Warrell DA, Oxford Textbook of Medicine 3rd ed. 1996, pp. 1126-1139 (not read). Not species-specific; the 2 h statement is a clinical rule of thumb, not a measured upper bound. Applies to Daboia local_swelling (Echis swelling already has a cited window). Used only in the cited-alternative sensitivity `configs/sim_v2_viper_swelling.yaml`, not in the primary table |
+| vipers (general) | local_pain | 0 | | secondary review | mehta2002clinical | "Local pain" paragraph | "Burning, bursting or throbbing pain may develop immediately after the bite and spread proximally up the bitten limb." | no upper bound, so no window; Daboia / Echis local_pain stay label-only |
+
+Leads checked and not usable:
+- Bawaskar & Bawaskar 2004 (Wilderness Environ Med, krait and cobra, Mahad): a figure caption "Two hours after cobra bite: fang marks with blood over right index finger, edema over dorsum of hand". That is n=1 and an observation time, not an onset, so Naja local_swelling stays label-only.
+- UCSD toxicology snakebite protocol pages (Russell's viper, Naja naja): "signs of envenomation usually manifest between 15 minutes and two hours". Undated web protocol with no primary citation; not used.
+- Warrell 1977 Nigeria Echis series: wrong species complex and region; no onset times in the abstract.
+- Kularatne 2003 (Daboia, 336 patients) and Kularatne 2011 (Echis, Jaffna, 26 patients): only abstracts cached (no onset of local signs); full texts still to be read.
